@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Racing Analysis Tool v4</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0e0e0e;color:#e0e0e0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── Topbar ── */
+#topbar{background:#161616;border-bottom:1px solid #2a2a2a;padding:7px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+#topbar h1{font-size:14px;font-weight:600;color:#f0f0f0;letter-spacing:.4px}
+.log-badge{font-size:10px;padding:2px 9px;border-radius:10px;font-weight:700;letter-spacing:.4px;cursor:default}
+.lb1{background:#1b3b1b;color:#4caf50;border:1px solid #2e6b2e}
+.lb2{background:#182035;color:#4a9eff;border:1px solid #2a4a7a}
+#loadBtn{background:#1e5c1e;border:1px solid #2e7d32;color:#a5d6a7;padding:5px 12px;font-size:11px;font-weight:600;border-radius:5px;cursor:pointer;transition:background .15s;white-space:nowrap}
+#loadBtn:hover{background:#256e25}
+#fileInput{display:none}
+
+/* ── Slicer (Top Bar) ── */
+.slicer-row { display:flex; align-items:center; width:100%; gap: 6px; }
+.slicer-lbl { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; }
+.slicer-time { font-size:11px; font-variant-numeric:tabular-nums; font-weight:700; }
+.slicer-time.st { color:#4caf50; }
+.slicer-time.et { color:#e8943a; }
+
+.slr-btn {
+  background: #252525; border: 1px solid #3a3a3a; color: #ccc;
+  border-radius: 4px; cursor: pointer; padding: 2px 7px; font-size: 10px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.1s;
+}
+.slr-btn:hover { background: #353535; color: #fff; }
+.slr-btn:active { background: #4caf50; border-color: #4caf50; color: #fff; }
+
+input[type=range].slr {
+  -webkit-appearance: none; appearance: none;
+  flex: 1; height: 6px; background: #252525;
+  border-radius: 3px; outline: none; margin: 0 4px;
+  cursor: pointer;
+}
+input[type=range].slr::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #4caf50; cursor: pointer; transition: transform .1s;
+}
+input[type=range].slr::-webkit-slider-thumb:hover { transform: scale(1.2); }
+input[type=range].slr.end-slr::-webkit-slider-thumb { background: #e8943a; }
+input[type=range].slr::-moz-range-thumb {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #4caf50; cursor: pointer; border: none;
+}
+input[type=range].slr.end-slr::-moz-range-thumb { background: #e8943a; }
+
+/* ── Main layout ── */
+#main{display:flex;flex:1;overflow:hidden}
+#sidebar{width:218px;min-width:218px;background:#111;border-right:1px solid #202020;display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0}
+.sb-sec{padding:5px 9px;border-bottom:1px solid #1b1b1b}
+.sb-lbl{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#ddd;margin-bottom:3px;font-weight:600}
+select{width:100%;background:#1a1a1a;border:1px solid #2a2a2a;color:#bbb;padding:3px 6px;border-radius:4px;font-size:11px;cursor:pointer;outline:none}
+select:focus{border-color:#444}
+select option{background:#1a1a1a}
+
+/* Lap lists */
+.lap-scroll{width:100%;background:#141414;border:1px solid #252525;border-radius:4px;overflow-y:auto;max-height:150px}
+.lap-item{padding:3px 6px;cursor:pointer;font-size:11px;color:#aaa;border-bottom:1px solid #1b1b1b;display:flex;align-items:center;gap:5px;transition:background .12s}
+.lap-item:last-child{border-bottom:none}
+.lap-item:hover{background:#1c2a1c}
+.lap-item.sel-pri{background:#162516;color:#4caf50;border-left:2px solid #4caf50}
+.lap-item.sel-cmp{background:#121e30;color:#4a9eff;border-left:2px solid #4a9eff}
+.lap-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.d1{background:#4caf50}.d2{background:#4a9eff}
+
+#updateBtn{background:#1e5c1e;border:1px solid #2e7d32;color:#a5d6a7;padding:4px;font-size:11px;font-weight:600;border-radius:5px;width:100%;margin-top:4px;cursor:pointer;transition:background .15s}
+#updateBtn:hover{background:#256e25}
+
+/* Stats */
+#statsBox{padding:2px 9px 5px;font-size:11px;color:#999;line-height:1.4}
+.sr{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1d1d1d;padding:1px 0}
+.sk{color:#999;font-size:11px}
+.sv{color:#e0e0e0;font-weight:600;font-variant-numeric:tabular-nums;font-size:11px}
+.sv.c1{color:#4caf50}.sv.c2{color:#4a9eff}
+.ssep{font-size:9px;padding:3px 0 1px;text-align:left;letter-spacing:1.5px;color:#666;font-weight:700;text-transform:uppercase;border-bottom:1px solid #1d1d1d;margin-bottom:1px; margin-top:2px;}
+/* value chips */
+.vc{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.2px}
+.vc.vg{background:#0a2210;color:#4caf50;border:1px solid #1a4a1a}
+.vc.vw{background:#251500;color:#e8943a;border:1px solid #5a3000}
+.vc.vb{background:#250a0a;color:#e05050;border:1px solid #5a1010}
+.vc.vn{background:#181818;color:#aaa;border:1px solid #2a2a2a}
+.vc.v1{background:#0a2210;color:#4caf50;border:1px solid #1a4a1a}
+.vc.v2{background:#0a1525;color:#4a9eff;border:1px solid #1a3a6a}
+
+/* ── Content grid ── */
+#content{flex:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 195px;gap:0;overflow:hidden}
+#mapWrap{position:relative;border-right:1px solid #1a1a1a;border-bottom:1px solid #1a1a1a;overflow:hidden}
+#mapCanvas{width:100%;height:100%;display:block}
+#mapOverlay{position:absolute;top:7px;left:7px;background:rgba(0,0,0,.72);border:1px solid #252525;border-radius:5px;padding:4px 9px;font-size:10px;color:#999;pointer-events:none;max-width:190px}
+#mapOverlay b{color:#4caf50;display:block;font-size:10px}
+
+/* GPS log switch */
+#gpsSw{position:absolute;bottom:8px;left:8px;display:flex;background:rgba(10,10,10,.85);border:1px solid #2a2a2a;border-radius:5px;overflow:hidden;z-index:5}
+.gsb{padding:4px 11px;font-size:10px;cursor:pointer;border:none;background:transparent;color:#555;font-weight:700;letter-spacing:.3px;transition:all .15s}
+.gsb.a1{background:#162516;color:#4caf50}
+.gsb.a2{background:#121e30;color:#4a9eff}
+
+#colorbar{position:absolute;right:6px;top:28px;width:13px;height:100px;border-radius:3px;overflow:hidden;border:1px solid #2a2a2a}
+#cbLabels{position:absolute;right:23px;top:28px;display:flex;flex-direction:column;justify-content:space-between;height:100px;font-size:9px;color:#777;text-align:right}
+
+#chartsRight{display:flex;flex-direction:column;border-bottom:1px solid #1a1a1a;overflow:hidden}
+.cpanel{flex:1;border-bottom:1px solid #151515;position:relative;padding:18px 7px 3px 3px;min-height:0}
+.cpanel:last-child{border-bottom:none}
+.ct{position:absolute;top:4px;left:9px;font-size:10px;color:#777;text-transform:uppercase;letter-spacing:.6px;z-index:2;font-weight:600;pointer-events:none}
+
+/* Chart legend built-in */
+.chart-legend{position:absolute;top:4px;right:9px;display:flex;gap:8px;z-index:3;pointer-events:none}
+.cl-item{display:flex;align-items:center;gap:3px;font-size:9px;font-weight:600}
+.cl-line{width:16px;height:2px;border-radius:1px}
+.cl-line.dashed{background:repeating-linear-gradient(90deg,currentColor 0,currentColor 4px,transparent 4px,transparent 7px);height:2px}
+
+#traceRow{grid-column:1/2;grid-row:2/3;display:flex;flex-direction:column;overflow:hidden;position:relative}
+.cpanel-full{flex:1;position:relative;padding:18px 7px 3px 3px;min-height:0}
+#bottomRight{grid-column:2/3;grid-row:2/3;position:relative;overflow:hidden;padding:18px 7px 3px 3px}
+
+canvas{display:block}
+
+/* ── Drop zone ── */
+#dropZone{position:fixed;inset:0;background:rgba(0,0,0,.82);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;border:3px dashed #2e7d32;pointer-events:none;opacity:0;transition:opacity .2s}
+#dropZone.active{opacity:1;pointer-events:all}
+#dropZone p{font-size:16px;color:#4caf50;font-weight:600;margin-top:10px}
+#dropZone small{color:#777;margin-top:3px}
+
+/* ── Welcome ── */
+#welcomeOverlay{position:fixed;inset:0;background:#0e0e0e;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:50;gap:12px}
+#welcomeOverlay h2{font-size:19px;color:#e0e0e0;font-weight:500}
+#welcomeOverlay p{font-size:12px;color:#555;max-width:360px;text-align:center;line-height:1.65}
+.drop-hint{border:2px dashed #252525;border-radius:10px;padding:26px 42px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;transition:border-color .2s}
+.drop-hint:hover{border-color:#2e7d32}
+.drop-hint span{color:#666;font-size:12px}
+.drop-hint small{color:#3a3a3a;font-size:11px}
+
+
+/* Log file rows */
+.lf-row{display:flex;align-items:center;gap:6px;margin-bottom:3px;font-size:11px;color:#888}
+.lf-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.lf-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.lf-remove{cursor:pointer;color:#444;font-size:12px;padding:0 2px;line-height:1;flex-shrink:0}
+.lf-remove:hover{color:#e05050}
+</style>
+</head>
+<body>
+
+<div id="welcomeOverlay">
+  <svg width="42" height="42" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="23" stroke="#2e7d32" stroke-width="1.5"/><path d="M12 28 Q18 14 24 20 Q30 26 36 12" stroke="#4caf50" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="24" cy="24" r="3" fill="#4caf50"/></svg>
+  <h2>Racing Analysis Tool v4</h2>
+  <p>Load up to two CSV or XLSX telemetry logs. Both logs overlay all charts for direct comparison. Use the lap slicer to section out laps.</p>
+  <div class="drop-hint" id="welcomeLoadBtn">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4caf50" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    <span>Click or drop files here</span>
+    <small>CSV or XLSX · up to 2 logs · add more later</small>
+  </div>
+  <input type="file" id="fileInputWelcome" accept=".csv,.xlsx,.xls" multiple style="display:none">
+</div>
+
+<div id="dropZone">
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#4caf50" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+  <p>Drop telemetry files here</p>
+  <small>CSV or XLSX · will add to existing logs</small>
+</div>
+
+<div id="topbar">
+  <svg width="18" height="18" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="22" stroke="#2e7d32" stroke-width="1.5"/><path d="M12 28 Q18 14 24 20 Q30 26 36 12" stroke="#4caf50" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="24" cy="24" r="3" fill="#4caf50"/></svg>
+  <h1>Racing Analysis v4</h1>
+  <div class="log-badge lb1" id="lb1" style="display:none">● LOG 1</div>
+  <div class="log-badge lb2" id="lb2" style="display:none">● LOG 2</div>
+  <div style="flex:1"></div>
+  <button id="loadBtn" onclick="document.getElementById('fileInput').click()">+ Add Log</button>
+  <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" multiple>
+</div>
+
+<div id="sliceSec" style="display:none; background:#111; border-bottom:1px solid #202020; padding:8px 16px; flex-shrink:0;">
+  <div style="display:flex; gap: 20px; align-items: center; width: 100%;">
+    
+    <div style="min-width: 140px;">
+      <div style="font-size:11px; text-transform:uppercase; letter-spacing:.8px; color:#aaa; font-weight:600; margin-bottom:4px;">Lap Slicer</div>
+      <select id="sliceSessEl" style="width:100%; display:none;"></select>
+      <div id="sliceInfo" style="font-size:11px; color:#666; font-variant-numeric:tabular-nums; margin-top:4px;">— select a range —</div>
+    </div>
+
+    <div style="flex:1; display:flex; flex-direction:column; gap: 8px;">
+      <div class="slicer-row">
+        <span class="slicer-lbl" style="color:#4caf50; width:50px;">▶ Start</span>
+        <button class="slr-btn" id="btnStartMinus">◄</button>
+        <input type="range" class="slr" id="sliceStart" min="0" max="1000" value="0">
+        <button class="slr-btn" id="btnStartPlus">►</button>
+        <span class="slicer-time st" id="sliceStartT" style="width:55px; text-align:right;">0:00.00</span>
+      </div>
+      <div class="slicer-row">
+        <span class="slicer-lbl" style="color:#e8943a; width:50px;">■ End</span>
+        <button class="slr-btn" id="btnEndMinus">◄</button>
+        <input type="range" class="slr end-slr" id="sliceEnd" min="0" max="1000" value="1000">
+        <button class="slr-btn" id="btnEndPlus">►</button>
+        <span class="slicer-time et" id="sliceEndT" style="width:55px; text-align:right;">—</span>
+      </div>
+    </div>
+
+    <div style="min-width: 150px; display:flex; flex-direction:column; gap: 4px;">
+      <button id="sliceAddBtn" style="background:#1a3a1a;border:1px solid #2e7d32;color:#a5d6a7;padding:5px;font-size:11px;font-weight:600;border-radius:5px;width:100%;cursor:pointer;transition:background .15s;" disabled>+ Add as Lap</button>
+      <button id="sliceClearBtn" style="background:#1a1a1a;border:1px solid #2a2a2a;color:#666;padding:3px;font-size:10px;border-radius:4px;width:100%;cursor:pointer;">↺ Reset Sliders</button>
+      
+      <div id="lapNameRow" style="display:none; margin-top:2px;">
+        <div style="display:flex;gap:4px">
+          <input id="lapNameInput" type="text" style="flex:1;background:#1a1a1a;border:1px solid #3a3a3a;color:#ccc;padding:3px 5px;border-radius:4px;font-size:10px;outline:none" placeholder="Enter lap name…">
+          <button id="lapNameSave" style="background:#1e5c1e;border:1px solid #2e7d32;color:#a5d6a7;padding:3px 6px;font-size:10px;font-weight:700;border-radius:4px;cursor:pointer">✓</button>
+        </div>
+      </div>
+      
+      <div id="editLapRow" style="display:none; margin-top:2px;">
+        <button id="editLapBtn" style="background:#1a2a3a;border:1px solid #2a4a6a;color:#4a9eff;padding:4px;font-size:10px;font-weight:600;border-radius:4px;width:100%;cursor:pointer">Edit Selected Lap</button>
+        <div style="display:flex; gap:4px; margin-top:4px;">
+            <button id="editLapApply" style="display:none;flex:1;background:#1a3a4a;border:1px solid #2a6a8a;color:#4addff;padding:3px;font-size:9px;font-weight:600;border-radius:4px;cursor:pointer">↺ Apply</button>
+            <button id="editLapDelete" style="display:none;flex:1;background:#2a0a0a;border:1px solid #6a1010;color:#e05050;padding:3px;font-size:9px;font-weight:600;border-radius:4px;cursor:pointer">✕ Delete</button>
+        </div>
+      </div>
+    </div>
+    
+  </div>
+</div>
+
+<div id="main">
+  <div id="sidebar">
+
+    <div class="sb-sec" id="logSec" style="display:none">
+      <div class="sb-lbl">Loaded Logs</div>
+      <div id="logList"></div>
+    </div>
+
+    <div class="sb-sec">
+      <div class="sb-lbl">Map Channel</div>
+      <select id="chanSel"></select>
+    </div>
+
+    <div class="sb-sec">
+      <div class="sb-lbl">Primary <span style="color:#4caf50;font-size:9px;font-weight:700">solid line</span></div>
+      <div class="lap-scroll" id="lapList"></div>
+      <button id="updateBtn" onclick="doUpdate()">▶ Update Charts</button>
+    </div>
+
+    <div class="sb-sec">
+      <div class="sb-lbl">Compare <span style="color:#4a9eff;font-size:9px;font-weight:700">dashed line</span></div>
+      <div class="lap-scroll" id="cmpList"></div>
+    </div>
+
+    <div class="sb-sec">
+      <div class="sb-lbl">GPS Colormap</div>
+      <select id="cmapSel">
+        <option value="jet">Jet</option><option value="hot">Hot</option>
+        <option value="cool">Cool</option><option value="viridis">Viridis</option>
+        <option value="plasma">Plasma</option><option value="turbo">Turbo</option>
+      </select>
+    </div>
+
+    <div class="sb-sec">
+      <div class="sb-lbl">X Axis</div>
+      <select id="xaxSel">
+        <option value="dist">Distance (m)</option>
+        <option value="time">Time (s)</option>
+      </select>
+    </div>
+
+    <div class="sb-sec" style="border-bottom:none">
+      <div class="sb-lbl">Stats</div>
+      <div id="statsBox"><span style="color:#333">Select laps &amp; click Update</span></div>
+    </div>
+  </div><div id="content">
+    <div id="mapWrap">
+      <canvas id="mapCanvas"></canvas>
+      <div id="mapOverlay" style="display:none"><b id="mapTitle">—</b><span id="mapSub" style="font-size:9px;color:#555"></span></div>
+      <div id="colorbar"></div>
+      <div id="cbLabels"><span id="cbMax">—</span><span id="cbMid">—</span><span id="cbMin">—</span></div>
+      <div id="gpsSw" style="display:none">
+        <button class="gsb a1" id="gsb1" onclick="setGpsLog(0)">GPS: LOG 1</button>
+        <button class="gsb" id="gsb2" onclick="setGpsLog(1)">GPS: LOG 2</button>
+      </div>
+    </div>
+
+    <div id="chartsRight">
+      <div class="cpanel" style="flex:2">
+        <span class="ct">Speed (mph avg rear)</span>
+        <div class="chart-legend" id="leg-spd"></div>
+        <canvas id="spdChart"></canvas>
+      </div>
+      <div class="cpanel" style="flex:1.5">
+        <span class="ct">Throttle (TPS %)</span>
+        <div class="chart-legend" id="leg-tps"></div>
+        <canvas id="tpsChart"></canvas>
+      </div>
+      <div class="cpanel" style="flex:1.5">
+        <span class="ct">Brake Pressure (psi)</span>
+        <div class="chart-legend" id="leg-brk"></div>
+        <canvas id="brkChart"></canvas>
+      </div>
+    </div>
+
+    <div id="traceRow">
+      <div class="cpanel-full">
+        <span class="ct" id="traceTitle">Channel Trace</span>
+        <div class="chart-legend" id="leg-trace"></div>
+        <canvas id="traceChart"></canvas>
+      </div>
+    </div>
+
+    <div id="bottomRight">
+      <span class="ct">Gear &amp; RPM</span>
+      <div class="chart-legend" id="leg-gear"></div>
+      <canvas id="gearChart"></canvas>
+    </div>
+
+<script>
+// ════════════════════════════════════════════════════
+// CONSTANTS
+// ════════════════════════════════════════════════════
+const COL={ELAPSED:3,REARBRK:4,FRTBRK:5,ACCELX:7,ACCELY:8,GSUM:13,RPM:18,TPS:19,LAMBDA:20,EOP:22,TCCUT:25,WSRR:26,WSRL:27,WSFL:28,WSFR:29,GEAR:38,BRKBAL:39,STEER:40,ENGTMP:41,MAP:42,LAT:48,LON:49,SPEED:50};
+const CHAN_NAMES=['TPS','WSRR','WSRL','WSFL','WSFR','FrontBrake','RearBrake','Speed(kph)','RPM','Gear','SteerAng','AccelX','AccelY','Gsum','Lambda','EOP','MAP','EngTemp','TCCut','BrakeBal'];
+const CHAN_UNITS=['%','mph','mph','mph','mph','psi','psi','kph','rpm','#','deg','G','G','G','λ','psi','psi','°C','%','%f'];
+const CHAN_COL=[COL.TPS,COL.WSRR,COL.WSRL,COL.WSFL,COL.WSFR,COL.FRTBRK,COL.REARBRK,COL.SPEED,COL.RPM,COL.GEAR,COL.STEER,COL.ACCELX,COL.ACCELY,COL.GSUM,COL.LAMBDA,COL.EOP,COL.MAP,COL.ENGTMP,COL.TCCUT,COL.BRKBAL];
+const I={TPS:0,WSRR:1,WSRL:2,WSFL:3,WSFR:4,FB:5,RB:6,SPD:7,RPM:8,GEAR:9,STEER:10,AX:11,AY:12,GSUM:13,TC:18};
+
+// Distinct colors: PRIMARY solid, COMPARE dashed — each with its own hue
+const C={
+  spd:  {pri:'#3ddc5a', cmp:'#22ddcc'},
+  tps:  {pri:'#b5e83a', cmp:'#ffd040'},
+  fbrk: {pri:'#e84040', cmp:'#ff6e20'},
+  rbrk: {pri:'#ff8c30', cmp:'#ffb060'},
+  trace:{pri:'#40b8ff', cmp:'#d060ff'},
+  gear: {pri:'#a060ff', cmp:'#ff60b0'},
+  rpm:  {pri:'#ff5050', cmp:'#ff9060'},
+};
+
+// ════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════
+let sessions=[];          // {lat,lon,elapsed,chanData,fileName}[]  max 2
+let allLaps=[];           // {sessIdx,r0,r1,label,durS}[]
+let selPri=-1, selCmp=-1;
+let charts={};
+let mapGpsLog=0;          // 0|1
+
+// ════════════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════════════
+const $=id=>document.getElementById(id);
+const sf=v=>{if(v===undefined||v===null||v==='')return NaN;const n=parseFloat(String(v).trim());return isFinite(n)?n:NaN;};
+const avg=a=>{const v=a.filter(x=>!isNaN(x));return v.length?v.reduce((s,x)=>s+x,0)/v.length:NaN;};
+const maxV=a=>{const v=a.filter(x=>!isNaN(x));return v.length?Math.max(...v):NaN;};
+const fmtT=s=>{const m=Math.floor(s/60);return`${String(m).padStart(2,'0')}:${(s-m*60).toFixed(2).padStart(5,'0')}`;};
+
+// ════════════════════════════════════════════════════
+// FILE LOADING
+// ════════════════════════════════════════════════════
+async function loadFiles(files){
+  files=Array.from(files).filter(f=>/\.(csv|xlsx|xls)$/i.test(f.name));
+  if(!files.length)return;
+  $('welcomeOverlay').style.display='none';
+
+  let added=0;
+  for(const f of files){
+    if(sessions.length>=2){alert('Maximum 2 logs loaded. Remove one first.');break;}
+    const sess=await parseFile(f);
+    if(sess&&sess.lat.length>10){sessions.push(sess);added++;}
+    else alert(`No valid GPS data in ${f.name}`);
+  }
+  if(!added)return;
+  refresh();
+}
+
+async function parseFile(file){
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(ext==='csv'||ext==='txt')return parseCSV(await file.text(),file.name);
+  if(ext==='xlsx'||ext==='xls'){
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    return parseRows(XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''}),file.name,false);
+  }
+  return null;
+}
+function parseCSV(text,name){
+  const lines=text.split(/\r?\n/);
+  return parseRows([lines[0].split(','),...lines.slice(1).map(l=>l.split(','))],name,true);
+}
+function parseRows(rows,name,skipFirst=false){
+  const lat=[],lon=[],elapsed=[],chanData=[];
+  const start=skipFirst?0:1;
+  for(let i=start;i<rows.length;i++){
+    const p=rows[i];
+    if(!p||p.length<Math.max(COL.LAT,COL.LON))continue;
+    const la=sf(p[COL.LAT-1]),lo=sf(p[COL.LON-1]);
+    if(isNaN(la)||isNaN(lo)||Math.abs(la)<1||Math.abs(lo)<1)continue;
+    lat.push(la);lon.push(lo);
+    elapsed.push(sf(p[COL.ELAPSED-1])||0);
+    const row=[];
+    for(const ci of CHAN_COL) row.push(sf(p[ci-1]));
+    chanData.push(row);
+  }
+  return{lat,lon,elapsed,chanData,fileName:name};
+}
+
+function removeSession(idx){
+  sessions.splice(idx,1);
+  if(mapGpsLog>=sessions.length)mapGpsLog=0;
+  refresh();
+}
+
+// ════════════════════════════════════════════════════
+// LAP DETECTION (Full Session Fallback Only)
+// ════════════════════════════════════════════════════
+function detectLaps(){
+  allLaps=[];
+  for(let si=0;si<sessions.length;si++){
+    const sess=sessions[si];
+    const n=sess.lat.length;
+    const durS=(sess.elapsed[n-1]-sess.elapsed[0])*60;
+    allLaps.push({sessIdx:si,r0:0,r1:n-1,label:`[L${si+1}] Full Session ${fmtT(durS)}`,durS});
+  }
+}
+
+// ════════════════════════════════════════════════════
+// UI RENDER
+// ════════════════════════════════════════════════════
+function refresh(){
+  updateBadges();
+  populateChannelSelect();
+  detectLaps();
+  if(selPri>=allLaps.length)selPri=allLaps.length-1;
+  if(selPri<0&&allLaps.length>0)selPri=0;
+  if(selCmp>=allLaps.length||selCmp===selPri)selCmp=-1;
+  renderLapLists();
+  drawBackground();
+  updateSlicerUI();
+  doUpdate();
+}
+
+function updateBadges(){
+  $('lb1').style.display=sessions.length>=1?'':'none';
+  $('lb2').style.display=sessions.length>=2?'':'none';
+  $('logSec').style.display=sessions.length?'block':'none';
+  $('gpsSw').style.display=sessions.length>=2?'flex':'none';
+  const ll=$('logList');ll.innerHTML='';
+  sessions.forEach((s,i)=>{
+    const d=document.createElement('div');d.className='lf-row';
+    d.innerHTML=`<div class="lf-dot" style="background:${i===0?'#4caf50':'#4a9eff'}"></div><span class="lf-name" title="${s.fileName}">${s.fileName}</span><span class="lf-remove" onclick="removeSession(${i})" title="Remove">✕</span>`;
+    ll.appendChild(d);
+  });
+  $('gsb1').className='gsb'+(mapGpsLog===0?(sessions.length>=1?' a1':''):'');
+  $('gsb2').className='gsb'+(mapGpsLog===1?' a2':'');
+}
+
+function populateChannelSelect(){
+  if($('chanSel').options.length>0)return; 
+  CHAN_NAMES.forEach((n,i)=>{const o=document.createElement('option');o.value=i;o.textContent=n;$('chanSel').appendChild(o);});
+}
+
+function renderLapLists(){
+  const ll=$('lapList'); ll.innerHTML='';
+  const cl=$('cmpList'); cl.innerHTML='';
+
+  const none=document.createElement('div');
+  none.className='lap-item'+(selCmp===-1?' sel-cmp':'');
+  none.innerHTML=`<div class="lap-dot" style="background:#333"></div><span style="color:#444">— none —</span>`;
+  none.onclick=()=>{selCmp=-1;renderLapLists();doUpdate();};
+  cl.appendChild(none);
+
+  allLaps.forEach((lap,i)=>{
+    const si=lap.sessIdx;
+    const dotCls=si===0?'d1':'d2';
+    const pi=document.createElement('div');
+    pi.className='lap-item'+(i===selPri?' sel-pri':'');
+    const renameBtn=lap.manual?`<span title="Rename" style="flex-shrink:0;cursor:pointer;color:#3a5a3a;font-size:11px;padding:0 2px;line-height:1" data-rename="${i}">✎</span>`:'';
+    pi.innerHTML=`<div class="lap-dot ${dotCls}"></div><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px">${lap.label}</span>${renameBtn}`;
+    pi.onclick=(e)=>{
+      if(e.target.dataset.rename!==undefined){showLapNameEditor(parseInt(e.target.dataset.rename));return;}
+      selPri=i;if(selCmp===i)selCmp=-1;slicePreviewActive=false;renderLapLists();doUpdate();
+    };
+    ll.appendChild(pi);
+
+    const ci=document.createElement('div');
+    ci.className='lap-item'+(i===selCmp?' sel-cmp':'');
+    ci.innerHTML=`<div class="lap-dot ${dotCls}"></div><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px">${lap.label}</span>`;
+    ci.onclick=()=>{selCmp=(selCmp===i)?-1:i;if(selCmp===selPri)selCmp=-1;renderLapLists();doUpdate();};
+    cl.appendChild(ci);
+  });
+
+  updateEditLapPanel();
+}
+
+// ════════════════════════════════════════════════════
+// MAP RENDERING & PROJECTION
+// ════════════════════════════════════════════════════
+const mapCanvas=$('mapCanvas');
+const mapCtx=mapCanvas.getContext('2d');
+function resizeMap(){const w=$('mapWrap');mapCanvas.width=w.clientWidth;mapCanvas.height=w.clientHeight;}
+new ResizeObserver(resizeMap).observe($('mapWrap'));resizeMap();
+
+let bgLats=[],bgLons=[];
+function drawBackground(){bgLats=[];bgLons=[];for(const s of sessions){bgLats.push(...s.lat);bgLons.push(...s.lon);}}
+
+// OPTIMIZED: Pre-calculate the projection math once per render
+function getProjector(allLa, allLo, W, H, pad=28) {
+  if(!allLa.length) return (la,lo)=>[0,0];
+  let minLa=allLa[0], maxLa=allLa[0], minLo=allLo[0], maxLo=allLo[0];
+  // Calculate bounds using a single loop, avoiding array spread memory overflows
+  for(let i=1;i<allLa.length;i++){
+    if(allLa[i]<minLa) minLa=allLa[i];
+    if(allLa[i]>maxLa) maxLa=allLa[i];
+    if(allLo[i]<minLo) minLo=allLo[i];
+    if(allLo[i]>maxLo) maxLo=allLo[i];
+  }
+  const dLa=maxLa-minLa||.001, dLo=maxLo-minLo||.001;
+  const sx=(W-pad*2)/dLo, sy=(H-pad*2)/dLa, sc=Math.min(sx,sy);
+  const ox=(W-dLo*sc)/2, oy=(H-dLa*sc)/2;
+  return (la, lo) => [ox+(lo-minLo)*sc, oy+(maxLa-la)*sc];
+}
+
+function getCmap(name){
+  const m={
+    jet:t=>{const r=Math.min(1,Math.max(0,1.5-Math.abs(4*t-3)));const g=Math.min(1,Math.max(0,1.5-Math.abs(4*t-2)));const b=Math.min(1,Math.max(0,1.5-Math.abs(4*t-1)));return[r,g,b];},
+    hot:t=>[Math.min(1,t*3),Math.min(1,Math.max(0,t*3-1)),Math.min(1,Math.max(0,t*3-2))],
+    cool:t=>[t,1-t,1],
+    viridis:t=>{const r=.267+t*(.127+t*(.604+t*(-.688+t*.268)));const g=.004+t*(.872+t*(-1.014+t*(.648+t*(-.212))));const b=.330+t*(1.105+t*(-2.279+t*(2.128+t*(-.735))));return[Math.min(1,Math.max(0,r)),Math.min(1,Math.max(0,g)),Math.min(1,Math.max(0,b))];},
+    plasma:t=>{const r=.050+t*(2.904+t*(-5.888+t*(4.932+t*(-1.588))));const g=.029+t*(-.268+t*(1.432+t*(-.514+t*(-.116))));const b=.527+t*(.424+t*(-.976+t*(.558+t*(-.174))));return[Math.min(1,Math.max(0,r)),Math.min(1,Math.max(0,g)),Math.min(1,Math.max(0,b))];},
+    turbo:t=>{const r=.13+t*(3.22+t*(-12.04+t*(18.03+t*(-10.83+t*2.30))));const g=.10+t*(2.57+t*(-3.73+t*(3.31+t*(-2.85+t*.62))));const b=.18+t*(2.65+t*(2.68+t*(-22.17+t*(34.92+t*(-17.51)))));return[Math.min(1,Math.max(0,r)),Math.min(1,Math.max(0,g)),Math.min(1,Math.max(0,b))];}
+  };return m[name]||m.jet;
+}
+function crgb(cm,t){const[r,g,b]=cm(Math.min(1,Math.max(0,t)));return`rgb(${(r*255|0)},${(g*255|0)},${(b*255|0)})`;}
+
+function drawColorBar(name,cmin,cmax){
+  const cb=$('colorbar');
+  const cv=document.createElement('canvas');cv.width=13;cv.height=100;
+  const c=cv.getContext('2d');const cm=getCmap(name);
+  for(let y=0;y<100;y++){c.fillStyle=crgb(cm,1-y/99);c.fillRect(0,y,13,1);}
+  cb.style.background=`url(${cv.toDataURL()})`;cb.style.backgroundSize='100% 100%';
+  $('cbMax').textContent=cmax.toFixed(1);$('cbMid').textContent=((cmin+cmax)/2).toFixed(1);$('cbMin').textContent=cmin.toFixed(1);
+}
+
+function paintMap(lapLa,lapLo,lapVals,cmin,cmax,cmapName){
+  const W=mapCanvas.width,H=mapCanvas.height;
+  mapCtx.clearRect(0,0,W,H);mapCtx.fillStyle='#0e0e0e';mapCtx.fillRect(0,0,W,H);
+  const allLa=[...bgLats,...lapLa],allLo=[...bgLons,...lapLo];
+  const proj = getProjector(allLa, allLo, W, H);
+
+  // Draw all session ghost tracks
+  for(let si=0;si<sessions.length;si++){
+    const s=sessions[si];if(s.lat.length<2)continue;
+    mapCtx.beginPath();mapCtx.strokeStyle=si===0?'#1e2e1e':'#1a1e2e';mapCtx.lineWidth=1.5;
+    for(let i=0;i<s.lat.length;i++){const[x,y]=proj(s.lat[i],s.lon[i]);i===0?mapCtx.moveTo(x,y):mapCtx.lineTo(x,y);}
+    mapCtx.stroke();
+  }
+
+  // Colored lap trace
+  const cm=getCmap(cmapName);const rng=Math.max(cmax-cmin,1e-9);
+  for(let i=0;i<lapLo.length-1;i++){
+    const t=isNaN(lapVals[i])?0:(lapVals[i]-cmin)/rng;
+    const[x1,y1]=proj(lapLa[i],lapLo[i]);
+    const[x2,y2]=proj(lapLa[i+1],lapLo[i+1]);
+    mapCtx.beginPath();mapCtx.strokeStyle=crgb(cm,t);mapCtx.lineWidth=4;mapCtx.lineCap='round';
+    mapCtx.moveTo(x1,y1);mapCtx.lineTo(x2,y2);mapCtx.stroke();
+  }
+
+  // Lap start dot
+  if(lapLa.length>0){
+    const[x,y]=proj(lapLa[0],lapLo[0]);
+    mapCtx.beginPath();mapCtx.arc(x,y,6,0,Math.PI*2);
+    mapCtx.fillStyle='#4caf50';mapCtx.fill();mapCtx.strokeStyle='#fff';mapCtx.lineWidth=1.5;mapCtx.stroke();
+  }
+}
+
+function setGpsLog(idx){
+  mapGpsLog=idx;
+  $('gsb1').className='gsb'+(idx===0?' a1':'');
+  $('gsb2').className='gsb'+(idx===1?' a2':'');
+  doUpdate();
+}
+
+// ════════════════════════════════════════════════════
+// CHARTS
+// ════════════════════════════════════════════════════
+const BASE_OPTS={responsive:true,maintainAspectRatio:false,animation:false,
+  plugins:{legend:{display:false},tooltip:{enabled:false}},
+  scales:{x:{type:'linear',grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#444',font:{size:9},maxTicksLimit:8}},
+          y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#444',font:{size:9},maxTicksLimit:5}}}};
+
+function opts(){return JSON.parse(JSON.stringify(BASE_OPTS));}
+
+function mkOrUp(id,data,o){
+  if(charts[id]){charts[id].data=data;charts[id].options=o;charts[id].update('none');return charts[id];}
+  charts[id]=new Chart($(id),{type:'line',data,options:o});return charts[id];
+}
+
+function mkDS(xVec,yVec,color,dashed=false,fill=false,yID='y'){
+  return{data:xVec.map((x,i)=>({x,y:isNaN(yVec[i])?null:yVec[i]})),
+    borderColor:color,backgroundColor:fill?hexA(color,.18):'transparent',
+    borderWidth:dashed?1.5:2,pointRadius:0,fill:fill?'origin':false,tension:0,spanGaps:true,
+    borderDash:dashed?[5,3]:[],yAxisID:yID};
+}
+function hexA(hex,a){
+  const c=document.createElement('canvas').getContext('2d');
+  c.fillStyle=hex;const col=c.fillStyle;
+  if(col.startsWith('#')){const r=parseInt(col.slice(1,3),16),g=parseInt(col.slice(3,5),16),b=parseInt(col.slice(5,7),16);return`rgba(${r},${g},${b},${a})`;}
+  return col;
+}
+
+function makeLegend(elId,entries){
+  const el=$(elId);el.innerHTML='';
+  entries.forEach(e=>{
+    const item=document.createElement('div');item.className='cl-item';
+    const line=document.createElement('div');
+    line.className='cl-line'+(e.dashed?' dashed':'');
+    line.style.background=e.dashed?'none':e.color;
+    line.style.color=e.color;
+    if(e.dashed){line.style.height='0';line.style.borderTop=`2px dashed ${e.color}`;}
+    const lbl=document.createElement('span');lbl.style.color=e.color;lbl.textContent=e.label;
+    item.appendChild(line);item.appendChild(lbl);
+    el.appendChild(item);
+  });
+}
+
+// ════════════════════════════════════════════════════
+// CUMULATIVE DISTANCE
+// ════════════════════════════════════════════════════
+function cumDist(lat,lon){
+  const R=6371000,d=[0];
+  for(let i=1;i<lat.length;i++){
+    const dla=(lat[i]-lat[i-1])*Math.PI/180,dlo=(lon[i]-lon[i-1])*Math.PI/180;
+    const a=Math.sin(dla/2)**2+Math.cos(lat[i-1]*Math.PI/180)*Math.cos(lat[i]*Math.PI/180)*Math.sin(dlo/2)**2;
+    d.push(d[i-1]+2*R*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
+  }
+  return d;
+}
+
+// ════════════════════════════════════════════════════
+// LAP VECTORS
+// ════════════════════════════════════════════════════
+function lapVec(lapIdx){
+  if(lapIdx<0||lapIdx>=allLaps.length)return null;
+  const{sessIdx,r0,r1}=allLaps[lapIdx];
+  const sess=sessions[sessIdx];
+  if(!sess||r1<=r0+1)return null;
+  const lat=sess.lat.slice(r0,r1+1);
+  const lon=sess.lon.slice(r0,r1+1);
+  const t=sess.elapsed.slice(r0,r1+1).map(v=>(v-sess.elapsed[r0])*60);
+  const dist=cumDist(lat,lon);
+  const cd=sess.chanData.slice(r0,r1+1);
+  return{lat,lon,t,dist,cd,si:sessIdx};
+}
+function wSpd(cd){return cd.map(r=>{const a=r[I.WSRR],b=r[I.WSRL];return(isNaN(a)&&isNaN(b))?NaN:isNaN(a)?b:isNaN(b)?a:(a+b)/2;});}
+
+// ════════════════════════════════════════════════════
+// MAIN UPDATE
+// ════════════════════════════════════════════════════
+function doUpdate(){
+  if(!sessions.length||!allLaps.length)return;
+  if(selPri<0||selPri>=allLaps.length)return;
+
+  const chanSel=parseInt($('chanSel').value)||0;
+  const cmapStr=$('cmapSel').value;
+  const useTime=$('xaxSel').value==='time';
+  const xLbl=useTime?'Time (s)':'Distance (m)';
+
+  const pv=lapVec(selPri); if(!pv)return;
+  const cv=selCmp>=0?lapVec(selCmp):null;
+
+  const pX=useTime?pv.t:pv.dist;
+  const cX=cv?(useTime?cv.t:cv.dist):null;
+
+  const ch=(cd,idx)=>cd.map(r=>r[idx]);
+  const pTPS=ch(pv.cd,I.TPS),pFB=ch(pv.cd,I.FB),pRB=ch(pv.cd,I.RB),pRPM=ch(pv.cd,I.RPM),pGear=ch(pv.cd,I.GEAR),pChan=ch(pv.cd,chanSel),pWS=wSpd(pv.cd);
+  const cTPS=cv?ch(cv.cd,I.TPS):null,cFB=cv?ch(cv.cd,I.FB):null,cRB=cv?ch(cv.cd,I.RB):null,cRPM=cv?ch(cv.cd,I.RPM):null,cGear=cv?ch(cv.cd,I.GEAR):null,cChan=cv?ch(cv.cd,chanSel):null,cWS=cv?wSpd(cv.cd):null;
+
+  if(!slicePreviewActive){
+  const gpsLapIdx=(()=>{
+    if(sessions.length<2)return selPri;
+    const want=mapGpsLog;
+    if(allLaps[selPri].sessIdx===want)return selPri;
+    if(cv&&allLaps[selCmp].sessIdx===want)return selCmp;
+    return selPri;
+  })();
+  const gv=lapVec(gpsLapIdx)||pv;
+  const mapChan=ch(gv.cd,chanSel);
+  const validM=mapChan.filter(v=>!isNaN(v));
+  const cmin=validM.length?Math.min(...validM):0;
+  const cmax=validM.length?Math.max(...validM):1;
+  paintMap(gv.lat,gv.lon,mapChan,cmin,cmax===cmin?cmin+1:cmax,cmapStr);
+  drawColorBar(cmapStr,cmin,cmax===cmin?cmin+1:cmax);
+  $('mapTitle').textContent=CHAN_NAMES[chanSel];
+  $('mapSub').textContent=allLaps[gpsLapIdx].label;
+  $('mapOverlay').style.display='block';
+  }
+
+  const priLabel=allLaps[selPri].label;
+  const cmpLabel=cv?allLaps[selCmp].label:null;
+
+  {
+    const o=opts();o.scales.x.title={display:true,text:xLbl,color:'#444',font:{size:9}};
+    const ds=[mkDS(pX,pWS,C.spd.pri,false,false,'y')];
+    const leg=[{label:priLabel,color:C.spd.pri,dashed:false}];
+    if(cv){ds.push(mkDS(cX,cWS,C.spd.cmp,true,false,'y'));leg.push({label:cmpLabel,color:C.spd.cmp,dashed:true});}
+    mkOrUp('spdChart',{datasets:ds},o);makeLegend('leg-spd',leg);
+  }
+
+  {
+    const o=opts();o.scales.x.title={display:true,text:xLbl,color:'#444',font:{size:9}};o.scales.y.min=0;o.scales.y.max=100;
+    const ds=[mkDS(pX,pTPS,C.tps.pri,false,true,'y')];
+    const leg=[{label:priLabel,color:C.tps.pri,dashed:false}];
+    if(cv){ds.push(mkDS(cX,cTPS,C.tps.cmp,true,false,'y'));leg.push({label:cmpLabel,color:C.tps.cmp,dashed:true});}
+    mkOrUp('tpsChart',{datasets:ds},o);makeLegend('leg-tps',leg);
+  }
+
+  {
+    const o=opts();o.scales.x.title={display:true,text:xLbl,color:'#444',font:{size:9}};
+    const ds=[
+      mkDS(pX,pFB,C.fbrk.pri,false,true,'y'),
+      mkDS(pX,pRB,C.rbrk.pri,false,false,'y'),
+    ];
+    const leg=[{label:`${priLabel} Frt`,color:C.fbrk.pri,dashed:false},{label:'Rear',color:C.rbrk.pri,dashed:false}];
+    if(cv){
+      ds.push(mkDS(cX,cFB,C.fbrk.cmp,true,false,'y'));
+      ds.push(mkDS(cX,cRB,C.rbrk.cmp,true,false,'y'));
+      leg.push({label:`${cmpLabel} Frt`,color:C.fbrk.cmp,dashed:true},{label:'Rear',color:C.rbrk.cmp,dashed:true});
+    }
+    const bc=mkOrUp('brkChart',{datasets:ds},o);
+    if(bc.options.plugins)bc.options.plugins.legend={display:false};
+    bc.update('none');makeLegend('leg-brk',leg);
+  }
+
+  {
+    const o=opts();
+    o.scales.x.title={display:true,text:xLbl,color:'#444',font:{size:9}};
+    o.scales.y.title={display:true,text:`${CHAN_NAMES[chanSel]} (${CHAN_UNITS[chanSel]})`,color:'#444',font:{size:9}};
+    const ds=[mkDS(pX,pChan,C.trace.pri,false,false,'y')];
+    const leg=[{label:priLabel,color:C.trace.pri,dashed:false}];
+    if(cv){ds.push(mkDS(cX,cChan,C.trace.cmp,true,false,'y'));leg.push({label:cmpLabel,color:C.trace.cmp,dashed:true});}
+    mkOrUp('traceChart',{datasets:ds},o);
+    $('traceTitle').textContent=CHAN_NAMES[chanSel]+' Trace';
+    makeLegend('leg-trace',leg);
+  }
+
+  {
+    const o={...opts(),scales:{
+      x:{type:'linear',grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#444',font:{size:9},maxTicksLimit:8},title:{display:true,text:xLbl,color:'#444',font:{size:9}}},
+      y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#444',font:{size:9},maxTicksLimit:6},position:'left',title:{display:true,text:'Gear',color:'#444',font:{size:9}}},
+      y2:{position:'right',grid:{drawOnChartArea:false},ticks:{color:C.rpm.pri,font:{size:9},maxTicksLimit:6},title:{display:true,text:'RPM/1000',color:'#444',font:{size:9}}}
+    }};
+    const ds=[
+      mkDS(pX,pGear,C.gear.pri,false,false,'y'),
+      mkDS(pX,pRPM.map(v=>isNaN(v)?NaN:v/1000),C.rpm.pri,false,false,'y2'),
+    ];
+    const leg=[{label:'Gear',color:C.gear.pri,dashed:false},{label:'RPM',color:C.rpm.pri,dashed:false}];
+    if(cv){
+      ds.push(mkDS(cX,cGear,C.gear.cmp,true,false,'y'));
+      ds.push(mkDS(cX,cRPM.map(v=>isNaN(v)?NaN:v/1000),C.rpm.cmp,true,false,'y2'));
+      leg.push({label:'Gear cmp',color:C.gear.cmp,dashed:true},{label:'RPM cmp',color:C.rpm.cmp,dashed:true});
+    }
+    if(!charts['gearChart']){charts['gearChart']=new Chart($('gearChart'),{type:'line',data:{datasets:ds},options:o});}
+    else{charts['gearChart'].data={datasets:ds};charts['gearChart'].options=o;charts['gearChart'].update('none');}
+    makeLegend('leg-gear',leg);
+  }
+
+  const deltaChips=[];
+  if(cv){
+    const delta=pv.t[pv.t.length-1]-cv.t[cv.t.length-1];
+    const s=delta>=0?'+':'';
+    deltaChips.push({k:'Lap Δ',v:`${s}${delta.toFixed(2)}s`,c:delta<0?'cg':delta>0?'cb':'cn'});
+    const spdDelta=avg(pWS.filter(v=>!isNaN(v)))-avg((cWS||[]).filter(v=>!isNaN(v)));
+    if(isFinite(spdDelta)) deltaChips.push({k:'Avg Spd Δ',v:`${spdDelta>=0?'+':''}${spdDelta.toFixed(1)} mph`,c:spdDelta>0?'cg':'cb'});
+  }
+
+  const pDurS=pv.t[pv.t.length-1];
+  const pDistM=pv.dist[pv.dist.length-1];
+  const vC=pChan.filter(v=>!isNaN(v));
+  const vW=pWS.filter(v=>!isNaN(v));
+  const vT=pTPS.filter(v=>!isNaN(v));
+  const fmt=v=>isFinite(v)?v.toFixed(1):'—';
+  const chip=(val,cls)=>`<span class="vc ${cls}">${val}</span>`;
+
+  const vAY=pv.cd.map(r=>r[I.AY]).filter(v=>!isNaN(v));
+  const vTC=pv.cd.map(r=>r[I.TC]).filter(v=>!isNaN(v));
+  const vGS=pv.cd.map(r=>r[I.GSUM]).filter(v=>!isNaN(v));
+  const vFB=pFB.filter(v=>!isNaN(v));
+  let analysisHtml='';
+  if(vT.length||vTC.length||vFB.length||vAY.length||vGS.length){
+    analysisHtml+=`<div class="ssep">Analysis</div>`;
+    if(vT.length){
+      const wotPct=vT.filter(v=>v>90).length/vT.length*100;
+      const coastPct=vT.filter(v=>v<5).length/vT.length*100;
+      analysisHtml+=`<div class="sr"><span class="sk">WOT</span>${chip(wotPct.toFixed(1)+'%', wotPct>50?'vg':wotPct>35?'vw':'vb')}</div>`;
+      analysisHtml+=`<div class="sr"><span class="sk">Coast</span>${chip(coastPct.toFixed(1)+'%', coastPct<15?'vg':'vw')}</div>`;
+    }
+    if(vTC.length){
+      const tcN=vTC.filter(v=>v>5).length;
+      analysisHtml+=`<div class="sr"><span class="sk">TC Cuts</span>${chip(tcN, tcN<10?'vg':tcN<30?'vw':'vb')}</div>`;
+    }
+    if(vFB.length){
+      const mb=Math.max(...vFB);
+      let bev=0,bIn=false;
+      pFB.forEach(v=>{if(!isNaN(v)){if(!bIn&&v>300){bIn=true;bev++;}else if(v<80)bIn=false;}});
+      analysisHtml+=`<div class="sr"><span class="sk">Max Brk</span>${chip(mb.toFixed(0)+' psi', mb>600?'vg':mb>350?'vw':'vb')}</div>`;
+      analysisHtml+=`<div class="sr"><span class="sk">Brk Zones</span>${chip(bev,'vn')}</div>`;
+    }
+    if(vAY.length){
+      const latG=Math.max(...vAY.map(Math.abs));
+      analysisHtml+=`<div class="sr"><span class="sk">Lat G</span>${chip(latG.toFixed(2)+' G', latG>1.8?'vg':latG>1.2?'vw':'vb')}</div>`;
+    }
+    if(vGS.length){
+      const pkG=maxV(vGS);
+      analysisHtml+=`<div class="sr"><span class="sk">Peak G</span>${chip(pkG.toFixed(2)+' G', pkG>2.5?'vg':pkG>1.8?'vw':'vb')}</div>`;
+    }
+  }
+
+  let cmpHtml='';
+  if(cv){
+    const cDurS=cv.t[cv.t.length-1];
+    const cDistM=cv.dist[cv.dist.length-1];
+    const cVC=cChan.filter(v=>!isNaN(v));
+    const cWS2=cWS.filter(v=>!isNaN(v));
+    cmpHtml=`
+      <div class="ssep">Compare</div>
+      <div class="sr"><span class="sk">Lap</span><span class="sv c2" style="font-size:9px;max-width:120px;overflow:hidden;text-overflow:ellipsis">${cmpLabel}</span></div>
+      <div class="sr"><span class="sk">Duration</span><span class="sv c2">${fmtT(cDurS)}</span></div>
+      <div class="sr"><span class="sk">Distance</span><span class="sv c2">${cDistM.toFixed(0)} m</span></div>
+      ${cVC.length?`<div class="sr"><span class="sk">${CHAN_NAMES[chanSel]} avg</span><span class="sv c2">${fmt(avg(cVC))}</span></div>`:''}
+      ${cWS2.length?`<div class="sr"><span class="sk">Spd avg</span><span class="sv c2">${fmt(avg(cWS2))} mph</span></div>`:''}
+    `;
+  }
+
+  $('statsBox').innerHTML=`
+    <div class="ssep">Primary</div>
+    <div class="sr"><span class="sk">Lap</span><span class="sv c1" style="font-size:9px;max-width:120px;overflow:hidden;text-overflow:ellipsis">${priLabel}</span></div>
+    <div class="sr"><span class="sk">Duration</span>${chip(fmtT(pDurS),'v1')}</div>
+    <div class="sr"><span class="sk">Distance</span><span class="sv">${pDistM.toFixed(0)} m</span></div>
+    ${vW.length?`
+    <div class="ssep">Speed</div>
+    <div class="sr"><span class="sk">Avg</span>${chip(fmt(avg(vW))+' mph','vn')}</div>
+    <div class="sr"><span class="sk">Max</span>${chip(fmt(maxV(vW))+' mph','vn')}</div>
+    `:''}
+    ${vC.length?`
+    <div class="ssep">${CHAN_NAMES[chanSel]}</div>
+    <div class="sr"><span class="sk">Avg</span><span class="sv">${fmt(avg(vC))} ${CHAN_UNITS[chanSel]}</span></div>
+    <div class="sr"><span class="sk">Max</span><span class="sv">${fmt(maxV(vC))} ${CHAN_UNITS[chanSel]}</span></div>
+    <div class="sr"><span class="sk">Min</span><span class="sv">${fmt(Math.min(...vC))} ${CHAN_UNITS[chanSel]}</span></div>
+    `:''}
+    ${analysisHtml}
+    ${cmpHtml}
+  `;
+}
+
+// ════════════════════════════════════════════════════
+// MANUAL LAP SLICER
+// ════════════════════════════════════════════════════
+let sliceSess=0, sliceR0=0, sliceR1=0, slicePreviewActive=false;
+
+function updateSlicerUI(){
+  const sec=$('sliceSec');
+  if(!sessions.length){sec.style.display='none';slicePreviewActive=false;return;}
+  sec.style.display='block'; 
+
+  const selEl=$('sliceSessEl');
+  if(sessions.length>=2){
+    selEl.style.display='block';
+    if(selEl.options.length!==sessions.length){
+      selEl.innerHTML='';
+      sessions.forEach((s,i)=>{
+        const o=document.createElement('option');
+        o.value=i;o.textContent=`Log ${i+1}: ${s.fileName.replace(/\.(csv|xlsx|xls)$/i,'')}`;
+        selEl.appendChild(o);
+      });
+    }
+  } else {
+    selEl.style.display='none';
+    sliceSess=0;
+  }
+
+  const sess=sessions[Math.min(sliceSess,sessions.length-1)];
+  const n=sess.lat.length-1;
+  const s0=$('sliceStart'), s1=$('sliceEnd');
+  const prevMax=parseInt(s0.max)||1000;
+  s0.max=n; s1.max=n;
+  if(prevMax!==n){
+    s0.value=0;
+    s1.value=n;
+  }
+  sliceR0=parseInt(s0.value);
+  sliceR1=parseInt(s1.value);
+  updateSliceLabels();
+}
+
+function updateSliceLabels(){
+  if(!sessions.length)return;
+  const sess=sessions[Math.min(sliceSess,sessions.length-1)];
+  sliceR0=Math.min(parseInt($('sliceStart').value), sess.lat.length-2);
+  sliceR1=Math.min(parseInt($('sliceEnd').value),   sess.lat.length-1);
+  if(sliceR1<=sliceR0) sliceR1=Math.min(sliceR0+2, sess.lat.length-1);
+
+  const e0=sess.elapsed[sliceR0]||0;
+  const e1=sess.elapsed[sliceR1]||0;
+  const t0=(e0-sess.elapsed[0])*60;
+  const t1=(e1-sess.elapsed[0])*60;
+  $('sliceStartT').textContent=fmtT(t0);
+  $('sliceEndT').textContent=fmtT(t1);
+  const durS=(e1-e0)*60;
+  const pts=sliceR1-sliceR0;
+  $('sliceInfo').textContent=pts>2?`${fmtT(durS)} · ${pts} pts`:'— select a wider range —';
+  $('sliceAddBtn').disabled=pts<10;
+}
+
+function drawSlicePreview(){
+  if(!sessions.length)return;
+  slicePreviewActive=true;
+  const W=mapCanvas.width, H=mapCanvas.height;
+  mapCtx.clearRect(0,0,W,H);
+  mapCtx.fillStyle='#0e0e0e';
+  mapCtx.fillRect(0,0,W,H);
+
+  const allLa=[...bgLats], allLo=[...bgLons];
+  if(!allLa.length)return;
+
+  const proj = getProjector(allLa, allLo, W, H);
+
+  for(let si=0;si<sessions.length;si++){
+    const s=sessions[si];
+    if(s.lat.length<2)continue;
+    mapCtx.beginPath();
+    mapCtx.strokeStyle='#1c1c1c';
+    mapCtx.lineWidth=1.5;
+    for(let i=0;i<s.lat.length;i++){
+      const[x,y]=proj(s.lat[i],s.lon[i]);
+      i===0?mapCtx.moveTo(x,y):mapCtx.lineTo(x,y);
+    }
+    mapCtx.stroke();
+  }
+
+  const sess=sessions[Math.min(sliceSess,sessions.length-1)];
+  if(sliceR0>0){
+    mapCtx.beginPath();
+    mapCtx.strokeStyle='#252525';
+    mapCtx.lineWidth=1.5;
+    for(let i=0;i<=sliceR0;i++){
+      const[x,y]=proj(sess.lat[i],sess.lon[i]);
+      i===0?mapCtx.moveTo(x,y):mapCtx.lineTo(x,y);
+    }
+    mapCtx.stroke();
+  }
+
+  const slat=sess.lat.slice(sliceR0,sliceR1+1);
+  const slon=sess.lon.slice(sliceR0,sliceR1+1);
+  const segN=slat.length;
+  if(segN>1){
+    for(let i=0;i<segN-1;i++){
+      const t=i/(segN-1);
+      const r=Math.round(60+t*168), g=Math.round(175-t*43), b=Math.round(60-t*20);
+      mapCtx.beginPath();
+      mapCtx.strokeStyle=`rgb(${r},${g},${b})`;
+      mapCtx.lineWidth=3.5;
+      mapCtx.lineCap='round';
+      const[x1,y1]=proj(slat[i],slon[i]);
+      const[x2,y2]=proj(slat[i+1],slon[i+1]);
+      mapCtx.moveTo(x1,y1);mapCtx.lineTo(x2,y2);
+      mapCtx.stroke();
+    }
+  }
+
+  if(slat.length>0){
+    const[x,y]=proj(slat[0],slon[0]);
+    mapCtx.beginPath();mapCtx.arc(x,y,6,0,Math.PI*2);
+    mapCtx.fillStyle='#4caf50';mapCtx.fill();
+    mapCtx.strokeStyle='#fff';mapCtx.lineWidth=1.5;mapCtx.stroke();
+    mapCtx.fillStyle='#000';mapCtx.font='bold 7px sans-serif';
+    mapCtx.textAlign='center';mapCtx.textBaseline='middle';
+    mapCtx.fillText('S',x,y);
+  }
+  if(slat.length>1){
+    const[x,y]=proj(slat[slat.length-1],slon[slon.length-1]);
+    mapCtx.beginPath();mapCtx.arc(x,y,6,0,Math.PI*2);
+    mapCtx.fillStyle='#e8943a';mapCtx.fill();
+    mapCtx.strokeStyle='#fff';mapCtx.lineWidth=1.5;mapCtx.stroke();
+    mapCtx.fillStyle='#000';mapCtx.font='bold 7px sans-serif';
+    mapCtx.textAlign='center';mapCtx.textBaseline='middle';
+    mapCtx.fillText('E',x,y);
+  }
+
+  if(segN>20){
+    for(let p=1;p<=9;p++){
+      const i=Math.round(p*segN/10);
+      const[x,y]=proj(slat[i],slon[i]);
+      mapCtx.beginPath();mapCtx.arc(x,y,2.5,0,Math.PI*2);
+      mapCtx.fillStyle='rgba(255,255,255,0.35)';mapCtx.fill();
+    }
+  }
+}
+
+function drawSlicePreviewWithGhost(origR0, origR1){
+  if(!sessions.length)return;
+  slicePreviewActive=true;
+  const W=mapCanvas.width, H=mapCanvas.height;
+  mapCtx.clearRect(0,0,W,H);
+  mapCtx.fillStyle='#0e0e0e';
+  mapCtx.fillRect(0,0,W,H);
+
+  const allLa=[...bgLats], allLo=[...bgLons];
+  if(!allLa.length)return;
+
+  const proj = getProjector(allLa, allLo, W, H);
+
+  for(let si=0;si<sessions.length;si++){
+    const s=sessions[si];
+    if(s.lat.length<2)continue;
+    mapCtx.beginPath();
+    mapCtx.strokeStyle='#1c1c1c';
+    mapCtx.lineWidth=1.5;
+    for(let i=0;i<s.lat.length;i++){
+      const[x,y]=proj(s.lat[i],s.lon[i]);
+      i===0?mapCtx.moveTo(x,y):mapCtx.lineTo(x,y);
+    }
+    mapCtx.stroke();
+  }
+
+  const sess=sessions[Math.min(sliceSess,sessions.length-1)];
+
+  if(origR0!==undefined&&origR1!==undefined){
+    const glat=sess.lat.slice(origR0,origR1+1);
+    const glon=sess.lon.slice(origR0,origR1+1);
+    if(glat.length>1){
+      mapCtx.beginPath();
+      mapCtx.strokeStyle='rgba(74,158,255,0.22)';
+      mapCtx.lineWidth=3;mapCtx.lineCap='round';
+      for(let i=0;i<glat.length;i++){
+        const[x,y]=proj(glat[i],glon[i]);
+        i===0?mapCtx.moveTo(x,y):mapCtx.lineTo(x,y);
+      }
+      mapCtx.stroke();
+    }
+    const[gx0,gy0]=proj(glat[0],glon[0]);
+    mapCtx.beginPath();mapCtx.arc(gx0,gy0,7,0,Math.PI*2);
+    mapCtx.strokeStyle='rgba(74,158,255,0.5)';mapCtx.lineWidth=1.5;mapCtx.setLineDash([3,3]);mapCtx.stroke();mapCtx.setLineDash([]);
+    const[gx1,gy1]=proj(glat[glat.length-1],glon[glon.length-1]);
+    mapCtx.beginPath();mapCtx.arc(gx1,gy1,7,0,Math.PI*2);
+    mapCtx.strokeStyle='rgba(232,148,58,0.5)';mapCtx.lineWidth=1.5;mapCtx.setLineDash([3,3]);mapCtx.stroke();mapCtx.setLineDash([]);
+  }
+
+  const slat=sess.lat.slice(sliceR0,sliceR1+1);
+  const slon=sess.lon.slice(sliceR0,sliceR1+1);
+  const segN=slat.length;
+  if(segN>1){
+    for(let i=0;i<segN-1;i++){
+      const t=i/(segN-1);
+      const r=Math.round(60+t*168), g=Math.round(175-t*43), b=Math.round(60-t*20);
+      mapCtx.beginPath();
+      mapCtx.strokeStyle=`rgb(${r},${g},${b})`;
+      mapCtx.lineWidth=3.5;
+      mapCtx.lineCap='round';
+      const[x1,y1]=proj(slat[i],slon[i]);
+      const[x2,y2]=proj(slat[i+1],slon[i+1]);
+      mapCtx.moveTo(x1,y1);mapCtx.lineTo(x2,y2);
+      mapCtx.stroke();
+    }
+  }
+
+  if(slat.length>0){
+    const[x,y]=proj(slat[0],slon[0]);
+    mapCtx.beginPath();mapCtx.arc(x,y,6,0,Math.PI*2);
+    mapCtx.fillStyle='#4caf50';mapCtx.fill();
+    mapCtx.strokeStyle='#fff';mapCtx.lineWidth=1.5;mapCtx.stroke();
+    mapCtx.fillStyle='#000';mapCtx.font='bold 7px sans-serif';
+    mapCtx.textAlign='center';mapCtx.textBaseline='middle';
+    mapCtx.fillText('S',x,y);
+  }
+  if(slat.length>1){
+    const[x,y]=proj(slat[slat.length-1],slon[slon.length-1]);
+    mapCtx.beginPath();mapCtx.arc(x,y,6,0,Math.PI*2);
+    mapCtx.fillStyle='#e8943a';mapCtx.fill();
+    mapCtx.strokeStyle='#fff';mapCtx.lineWidth=1.5;mapCtx.stroke();
+    mapCtx.fillStyle='#000';mapCtx.font='bold 7px sans-serif';
+    mapCtx.textAlign='center';mapCtx.textBaseline='middle';
+    mapCtx.fillText('E',x,y);
+  }
+
+  if(segN>20){
+    for(let p=1;p<=9;p++){
+      const i=Math.round(p*segN/10);
+      const[x,y]=proj(slat[i],slon[i]);
+      mapCtx.beginPath();mapCtx.arc(x,y,2.5,0,Math.PI*2);
+      mapCtx.fillStyle='rgba(255,255,255,0.35)';mapCtx.fill();
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════
+// BUTTON HANDLERS
+// ════════════════════════════════════════════════════
+
+// ── Lap name editor ──
+let pendingNameLapIdx=-1;
+function showLapNameEditor(lapIdx){
+  pendingNameLapIdx=lapIdx;
+  const lap=allLaps[lapIdx];
+  $('lapNameInput').value=lap.customName||lap.label;
+  $('lapNameRow').style.display='block';
+  $('lapNameInput').focus();
+  $('lapNameInput').select();
+}
+function saveLapName(){
+  if(pendingNameLapIdx<0||pendingNameLapIdx>=allLaps.length)return;
+  const nm=$('lapNameInput').value.trim();
+  if(nm){allLaps[pendingNameLapIdx].customName=nm;allLaps[pendingNameLapIdx].label=nm;}
+  $('lapNameRow').style.display='none';
+  pendingNameLapIdx=-1;
+  renderLapLists();doUpdate();
+}
+$('lapNameSave').addEventListener('click',saveLapName);
+$('lapNameInput').addEventListener('keydown',e=>{if(e.key==='Enter')saveLapName();if(e.key==='Escape'){$('lapNameRow').style.display='none';pendingNameLapIdx=-1;}});
+
+// ── Edit-lap panel ──
+let editingLapIdx=-1; 
+function updateEditLapPanel(){
+  const lap=selPri>=0&&selPri<allLaps.length?allLaps[selPri]:null;
+  const isManual=lap&&lap.manual;
+  $('editLapRow').style.display=isManual?'block':'none';
+  $('editLapApply').style.display='none';
+  $('editLapDelete').style.display='none';
+  if(isManual){
+    $('editLapDelete').style.display='block';
+  }
+  if(!isManual) editingLapIdx=-1;
+}
+
+$('editLapBtn').addEventListener('click',()=>{
+  if(selPri<0||selPri>=allLaps.length)return;
+  const lap=allLaps[selPri];
+  if(!lap.manual)return;
+  editingLapIdx=selPri;
+  const si=lap.sessIdx;
+  sliceSess=si;
+  $('sliceSessEl').value=si;
+  const sess=sessions[si];
+  const n=sess.lat.length-1;
+  $('sliceStart').max=n; $('sliceEnd').max=n;
+  $('sliceStart').value=lap.r0; $('sliceEnd').value=lap.r1;
+  updateSliceLabels();
+  drawSlicePreviewWithGhost(lap.r0, lap.r1);
+  $('editLapApply').style.display='block';
+  $('editLapDelete').style.display='block';
+});
+
+$('editLapApply').addEventListener('click',()=>{
+  if(editingLapIdx<0||editingLapIdx>=allLaps.length)return;
+  const r0=sliceR0,r1=sliceR1;
+  if(r1<=r0+10){alert('Select a wider range.');return;}
+  const lap=allLaps[editingLapIdx];
+  const sess=sessions[lap.sessIdx];
+  const durS=(sess.elapsed[r1]-sess.elapsed[r0])*60;
+  lap.r0=r0; lap.r1=r1; lap.durS=durS;
+  if(!lap.customName) lap.label=`[L${lap.sessIdx+1}] Manual ${fmtT(durS)}`;
+  editingLapIdx=-1;
+  slicePreviewActive=false;
+  $('editLapApply').style.display='none';
+  renderLapLists();doUpdate();
+});
+
+$('editLapDelete').addEventListener('click',()=>{
+  if(selPri<0||selPri>=allLaps.length)return;
+  if(!allLaps[selPri].manual)return;
+  allLaps.splice(selPri,1);
+  editingLapIdx=-1;
+  selPri=Math.max(0,selPri-1);
+  if(selCmp>=allLaps.length)selCmp=-1;
+  $('lapNameRow').style.display='none';
+  slicePreviewActive=false;
+  renderLapLists();doUpdate();
+});
+
+$('fileInput').addEventListener('change',e=>{if(e.target.files.length)loadFiles(Array.from(e.target.files));e.target.value='';});
+$('fileInputWelcome').addEventListener('change',e=>{if(e.target.files.length)loadFiles(Array.from(e.target.files));});
+$('welcomeLoadBtn').addEventListener('click',()=>$('fileInputWelcome').click());
+document.addEventListener('dragover',e=>{e.preventDefault();$('dropZone').classList.add('active');});
+document.addEventListener('dragleave',e=>{if(!e.relatedTarget)$('dropZone').classList.remove('active');});
+document.addEventListener('drop',e=>{
+  e.preventDefault();$('dropZone').classList.remove('active');
+  const fs=Array.from(e.dataTransfer.files).filter(f=>/\.(csv|xlsx|xls)$/i.test(f.name));
+  if(fs.length)loadFiles(fs);
+});
+
+$('chanSel').addEventListener('change',doUpdate);
+$('cmapSel').addEventListener('change',doUpdate);
+$('xaxSel').addEventListener('change',doUpdate);
+
+// ── Slicer events ──
+function getEditGhost(){
+  if(editingLapIdx>=0&&editingLapIdx<allLaps.length){
+    const lap=allLaps[editingLapIdx];
+    return{r0:lap.r0,r1:lap.r1};
+  }
+  return null;
+}
+$('sliceStart').addEventListener('input',()=>{
+  const s0=$('sliceStart'),s1=$('sliceEnd');
+  if(parseInt(s0.value)>=parseInt(s1.value)) s1.value=Math.min(parseInt(s0.value)+1,parseInt(s1.max));
+  updateSliceLabels();
+  const g=getEditGhost();
+  if(g) drawSlicePreviewWithGhost(g.r0,g.r1);
+  else drawSlicePreview();
+});
+$('sliceEnd').addEventListener('input',()=>{
+  const s0=$('sliceStart'),s1=$('sliceEnd');
+  if(parseInt(s1.value)<=parseInt(s0.value)) s0.value=Math.max(parseInt(s1.value)-1,0);
+  updateSliceLabels();
+  const g=getEditGhost();
+  if(g) drawSlicePreviewWithGhost(g.r0,g.r1);
+  else drawSlicePreview();
+});
+$('sliceSessEl').addEventListener('change',e=>{
+  sliceSess=parseInt(e.target.value);
+  const sess=sessions[sliceSess];
+  const n=sess.lat.length-1;
+  $('sliceStart').max=n; $('sliceStart').value=0;
+  $('sliceEnd').max=n;   $('sliceEnd').value=n;
+  updateSliceLabels(); drawSlicePreview();
+});
+$('sliceAddBtn').addEventListener('click',()=>{
+  if(!sessions.length)return;
+  const r0=sliceR0, r1=sliceR1;
+  if(r1<=r0+10){alert('Select a wider range.');return;}
+  const sess=sessions[sliceSess];
+  const durS=(sess.elapsed[r1]-sess.elapsed[r0])*60;
+  const manN=allLaps.filter(l=>l.manual).length+1;
+  allLaps.push({sessIdx:sliceSess,r0,r1,
+    label:`[L${sliceSess+1}] Manual ${manN} ${fmtT(durS)}`,durS,manual:true});
+  selPri=allLaps.length-1; selCmp=-1;
+  slicePreviewActive=false;
+  renderLapLists();
+  doUpdate();
+  $('sliceAddBtn').textContent='✓ Lap Added';
+  setTimeout(()=>{$('sliceAddBtn').textContent='+ Add as Lap';},1500);
+  showLapNameEditor(allLaps.length-1);
+});
+$('sliceClearBtn').addEventListener('click',()=>{
+  const sess=sessions[Math.min(sliceSess,sessions.length-1)];
+  if(!sess)return;
+  const n=sess.lat.length-1;
+  $('sliceStart').value=0; $('sliceEnd').value=n;
+  updateSliceLabels(); drawSlicePreview();
+});
+
+// Arrow Button Logic
+function stepSlider(id, dir) {
+  const el = $(id);
+  if(!el) return;
+  let val = parseInt(el.value) + dir;
+  val = Math.max(parseInt(el.min), Math.min(parseInt(el.max), val));
+  el.value = val;
+  el.dispatchEvent(new Event('input'));
+}
+
+$('btnStartMinus').addEventListener('click', () => stepSlider('sliceStart', -1));
+$('btnStartPlus').addEventListener('click', () => stepSlider('sliceStart', 1));
+$('btnEndMinus').addEventListener('click', () => stepSlider('sliceEnd', -1));
+$('btnEndPlus').addEventListener('click', () => stepSlider('sliceEnd', 1));
+
+</script>
+</body>
+</html>
