@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Racing Analysis Tool v4</title>
+<title>Racing Analysis Tool v7</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
@@ -148,9 +148,88 @@ canvas{display:block}
 .lf-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
 .lf-remove{cursor:pointer;color:#444;font-size:12px;padding:0 2px;line-height:1;flex-shrink:0}
 .lf-remove:hover{color:#e05050}
+
+/* ── Light Mode ── */
+body.light{background:#f5f3ee;color:#1a1a1a}
+body.light #topbar{background:#e8e4dc;border-bottom-color:#ccc8be}
+body.light #topbar h1{color:#111}
+body.light #sidebar{background:#ede9e1;border-right-color:#ccc8be}
+body.light .sb-sec{border-bottom-color:#d8d3c8}
+body.light .sb-lbl{color:#333}
+body.light select{background:#f0ece4;border-color:#bbb5a8;color:#222}
+body.light select option{background:#f0ece4}
+body.light .lap-scroll{background:#e8e4dc;border-color:#ccc8be}
+body.light .lap-item{color:#444;border-bottom-color:#d5d0c6}
+body.light .lap-item:hover{background:#d8f0d8}
+body.light .lap-item.sel-pri{background:#c8e8c8;color:#1a7a1a;border-left-color:#2e7d32}
+body.light .lap-item.sel-cmp{background:#c8d8f0;color:#1a4a9a;border-left-color:#2a6aaa}
+body.light #updateBtn{background:#2e7d32;border-color:#1b5e20;color:#e8f5e9}
+body.light #updateBtn:hover{background:#388e3c}
+body.light #statsBox{color:#555}
+body.light .sk{color:#555}
+body.light .sv{color:#111}
+body.light .ssep{color:#888;border-bottom-color:#d0ccc0}
+body.light .sr{border-bottom-color:#d8d3c8}
+body.light #content{background:#f5f3ee}
+body.light #mapWrap{background:#e8e4dc}
+body.light #mapOverlay{background:rgba(245,243,238,.92);border-color:#ccc}
+body.light #mapOverlay b{color:#2e7d32}
+body.light #gpsSw{background:rgba(230,226,218,.95);border-color:#bbb}
+body.light .gsb{color:#888}
+body.light .gsb.a1{background:#c8e8c8;color:#1a7a1a}
+body.light .gsb.a2{background:#c8d8f0;color:#1a4a9a}
+body.light .cpanel{background:#f5f3ee}
+body.light .ct{color:#666}
+body.light #sliceSec{background:#ede9e1;border-bottom-color:#ccc8be}
+body.light .slicer-lbl{color:#444}
+body.light .slr-btn{background:#e0dbd0;border-color:#bbb;color:#444}
+body.light .slr-btn:hover{background:#ccc;color:#111}
+body.light input[type=range].slr{background:#d5d0c6}
+body.light #sliceInfo{color:#777}
+body.light .lf-name{color:#333}
+body.light .lf-remove{color:#bbb}
+body.light #lb1{background:#c8e8c8;color:#1a7a1a;border-color:#7ab87a}
+body.light #lb2{background:#c8d8f0;color:#1a4a9a;border-color:#7aa8d8}
+body.light #welcomeOverlay{background:#f5f3ee}
+body.light #welcomeOverlay h2{color:#111}
+body.light #welcomeOverlay p{color:#777}
+body.light .drop-hint{border-color:#ccc}
+body.light .drop-hint span{color:#555}
+body.light .vc.vg{background:#d8f0d8;color:#1a6a1a;border-color:#7ab87a}
+body.light .vc.vw{background:#fff0d8;color:#8a4a00;border-color:#d4a050}
+body.light .vc.vb{background:#fdd;color:#8a1a1a;border-color:#d07070}
+body.light .vc.vn{background:#e8e4dc;color:#444;border-color:#bbb}
+body.light .vc.v1{background:#d8f0d8;color:#1a6a1a;border-color:#7ab87a}
+body.light .vc.v2{background:#c8d8f0;color:#1a4a9a;border-color:#7aa8d8}
+
+/* ── Crosshair Tooltip ── */
+#crosshairTooltip{
+  position:fixed;pointer-events:none;z-index:999;
+  background:rgba(10,10,10,.93);border:1px solid #333;
+  border-radius:6px;padding:7px 11px;font-size:11px;
+  color:#e0e0e0;line-height:1.6;min-width:150px;
+  box-shadow:0 4px 16px rgba(0,0,0,.5);
+  display:none;
+}
+body.light #crosshairTooltip{background:rgba(245,243,238,.97);border-color:#bbb;color:#222;box-shadow:0 4px 16px rgba(0,0,0,.15)}
+#crosshairTooltip .ct-row{display:flex;justify-content:space-between;gap:12px}
+#crosshairTooltip .ct-key{color:#888;font-size:10px}
+body.light #crosshairTooltip .ct-key{color:#666}
+#crosshairTooltip .ct-val{color:#e0e0e0;font-weight:700;font-variant-numeric:tabular-nums}
+body.light #crosshairTooltip .ct-val{color:#111}
+#crosshairTooltip .ct-head{font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#555;margin-bottom:3px;padding-bottom:3px;border-bottom:1px solid #252525}
+body.light #crosshairTooltip .ct-head{color:#888;border-bottom-color:#d0ccc0}
+
+/* Light mode toggle */
+#lightModeBtn{background:#1a1a1a;border:1px solid #2e2e2e;color:#777;padding:4px 10px;font-size:10px;font-weight:600;border-radius:5px;cursor:pointer;transition:all .15s;letter-spacing:.3px}
+#lightModeBtn:hover{background:#252525;color:#ccc}
+body.light #lightModeBtn{background:#e0dbd0;border-color:#bbb;color:#444}
+body.light #lightModeBtn:hover{background:#ccc;color:#111}
 </style>
 </head>
 <body>
+
+<div id="crosshairTooltip"></div>
 
 <div id="welcomeOverlay">
   <svg width="42" height="42" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="23" stroke="#2e7d32" stroke-width="1.5"/><path d="M12 28 Q18 14 24 20 Q30 26 36 12" stroke="#4caf50" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="24" cy="24" r="3" fill="#4caf50"/></svg>
@@ -172,10 +251,11 @@ canvas{display:block}
 
 <div id="topbar">
   <svg width="18" height="18" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="22" stroke="#2e7d32" stroke-width="1.5"/><path d="M12 28 Q18 14 24 20 Q30 26 36 12" stroke="#4caf50" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="24" cy="24" r="3" fill="#4caf50"/></svg>
-  <h1>Racing Analysis v4</h1>
+  <h1>Racing Analysis v7</h1>
   <div class="log-badge lb1" id="lb1" style="display:none">● LOG 1</div>
   <div class="log-badge lb2" id="lb2" style="display:none">● LOG 2</div>
   <div style="flex:1"></div>
+  <button id="lightModeBtn" onclick="toggleLightMode()">☀ Light</button>
   <button id="loadBtn" onclick="document.getElementById('fileInput').click()">+ Add Log</button>
   <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" multiple>
 </div>
@@ -263,6 +343,15 @@ canvas{display:block}
     </div>
 
     <div class="sb-sec">
+      <div class="sb-lbl">GPS Halfshaft Overlay</div>
+      <select id="halfshaftSel">
+        <option value="none">— None —</option>
+        <option value="hsl">HalfShaft L</option>
+        <option value="hsr">HalfShaft R</option>
+      </select>
+    </div>
+
+    <div class="sb-sec">
       <div class="sb-lbl">X Axis</div>
       <select id="xaxSel">
         <option value="dist">Distance (m)</option>
@@ -322,11 +411,11 @@ canvas{display:block}
 // ════════════════════════════════════════════════════
 // CONSTANTS
 // ════════════════════════════════════════════════════
-const COL={ELAPSED:3,REARBRK:4,FRTBRK:5,ACCELX:7,ACCELY:8,GSUM:13,RPM:18,TPS:19,LAMBDA:20,EOP:22,TCCUT:25,WSRR:26,WSRL:27,WSFL:28,WSFR:29,GEAR:38,BRKBAL:39,STEER:40,ENGTMP:41,MAP:42,LAT:48,LON:49,SPEED:50};
-const CHAN_NAMES=['TPS','WSRR','WSRL','WSFL','WSFR','FrontBrake','RearBrake','Speed(kph)','RPM','Gear','SteerAng','AccelX','AccelY','Gsum','Lambda','EOP','MAP','EngTemp','TCCut','BrakeBal'];
-const CHAN_UNITS=['%','mph','mph','mph','mph','psi','psi','kph','rpm','#','deg','G','G','G','λ','psi','psi','°C','%','%f'];
-const CHAN_COL=[COL.TPS,COL.WSRR,COL.WSRL,COL.WSFL,COL.WSFR,COL.FRTBRK,COL.REARBRK,COL.SPEED,COL.RPM,COL.GEAR,COL.STEER,COL.ACCELX,COL.ACCELY,COL.GSUM,COL.LAMBDA,COL.EOP,COL.MAP,COL.ENGTMP,COL.TCCUT,COL.BRKBAL];
-const I={TPS:0,WSRR:1,WSRL:2,WSFL:3,WSFR:4,FB:5,RB:6,SPD:7,RPM:8,GEAR:9,STEER:10,AX:11,AY:12,GSUM:13,TC:18};
+const COL={ELAPSED:3,REARBRK:4,FRTBRK:5,ACCELX:7,ACCELY:8,GSUM:13,RPM:18,TPS:19,LAMBDA:20,EOP:22,TCCUT:25,WSRR:26,WSRL:27,WSFL:28,WSFR:29,GEAR:38,BRKBAL:39,STEER:40,ENGTMP:41,MAP:42,HSL:43,HSR:44,LAT:48,LON:49,SPEED:50};
+const CHAN_NAMES=['TPS','WSRR','WSRL','WSFL','WSFR','FrontBrake','RearBrake','Speed(kph)','RPM','Gear','SteerAng','AccelX','AccelY','Gsum','Lambda','EOP','MAP','EngTemp','TCCut','BrakeBal','HalfShaftL','HalfShaftR'];
+const CHAN_UNITS=['%','mph','mph','mph','mph','psi','psi','kph','rpm','#','deg','G','G','G','λ','psi','psi','°C','%','%f','',''];
+const CHAN_COL=[COL.TPS,COL.WSRR,COL.WSRL,COL.WSFL,COL.WSFR,COL.FRTBRK,COL.REARBRK,COL.SPEED,COL.RPM,COL.GEAR,COL.STEER,COL.ACCELX,COL.ACCELY,COL.GSUM,COL.LAMBDA,COL.EOP,COL.MAP,COL.ENGTMP,COL.TCCUT,COL.BRKBAL,COL.HSL,COL.HSR];
+const I={TPS:0,WSRR:1,WSRL:2,WSFL:3,WSFR:4,FB:5,RB:6,SPD:7,RPM:8,GEAR:9,STEER:10,AX:11,AY:12,GSUM:13,TC:18,HSL:20,HSR:21};
 
 // Distinct colors: PRIMARY solid, COMPARE dashed — each with its own hue
 const C={
@@ -545,21 +634,32 @@ function drawColorBar(name,cmin,cmax){
   $('cbMax').textContent=cmax.toFixed(1);$('cbMid').textContent=((cmin+cmax)/2).toFixed(1);$('cbMin').textContent=cmin.toFixed(1);
 }
 
-function paintMap(lapLa,lapLo,lapVals,cmin,cmax,cmapName){
+// Store last map state for crosshair re-draw
+let lastMapState=null;
+
+function paintMap(lapLa,lapLo,lapVals,cmin,cmax,cmapName,hsVals=null,hsLabel=null){
+  const light=document.body.classList.contains('light');
   const W=mapCanvas.width,H=mapCanvas.height;
-  mapCtx.clearRect(0,0,W,H);mapCtx.fillStyle='#0e0e0e';mapCtx.fillRect(0,0,W,H);
+  mapCtx.clearRect(0,0,W,H);
+  mapCtx.fillStyle=light?'#e8e4dc':'#0e0e0e';
+  mapCtx.fillRect(0,0,W,H);
   const allLa=[...bgLats,...lapLa],allLo=[...bgLons,...lapLo];
   const proj = getProjector(allLa, allLo, W, H);
+
+  // Store projector + data for crosshair dot redraws
+  lastMapState={lapLa,lapLo,proj,lapVals,cmin,cmax,cmapName,hsVals,hsLabel,light};
 
   // Draw all session ghost tracks
   for(let si=0;si<sessions.length;si++){
     const s=sessions[si];if(s.lat.length<2)continue;
-    mapCtx.beginPath();mapCtx.strokeStyle=si===0?'#1e2e1e':'#1a1e2e';mapCtx.lineWidth=1.5;
+    mapCtx.beginPath();
+    mapCtx.strokeStyle=light?(si===0?'#c0d8c0':'#b8c8d8'):(si===0?'#1e2e1e':'#1a1e2e');
+    mapCtx.lineWidth=1.5;
     for(let i=0;i<s.lat.length;i++){const[x,y]=proj(s.lat[i],s.lon[i]);i===0?mapCtx.moveTo(x,y):mapCtx.lineTo(x,y);}
     mapCtx.stroke();
   }
 
-  // Colored lap trace
+  // Colored lap trace (primary channel)
   const cm=getCmap(cmapName);const rng=Math.max(cmax-cmin,1e-9);
   for(let i=0;i<lapLo.length-1;i++){
     const t=isNaN(lapVals[i])?0:(lapVals[i]-cmin)/rng;
@@ -569,12 +669,57 @@ function paintMap(lapLa,lapLo,lapVals,cmin,cmax,cmapName){
     mapCtx.moveTo(x1,y1);mapCtx.lineTo(x2,y2);mapCtx.stroke();
   }
 
+  // HalfShaft overlay (drawn on top as thin colored line)
+  if(hsVals&&hsVals.length===lapLa.length){
+    const hsValid=hsVals.filter(v=>!isNaN(v));
+    const hsMin=hsValid.length?Math.min(...hsValid):0;
+    const hsMax=hsValid.length?Math.max(...hsValid):1;
+    const hsRng=Math.max(hsMax-hsMin,1e-9);
+    const hsCm=getCmap('turbo');
+    for(let i=0;i<lapLo.length-1;i++){
+      const t=isNaN(hsVals[i])?0:(hsVals[i]-hsMin)/hsRng;
+      const[x1,y1]=proj(lapLa[i],lapLo[i]);
+      const[x2,y2]=proj(lapLa[i+1],lapLo[i+1]);
+      mapCtx.beginPath();
+      // Offset slightly so it shows beside the main trace
+      mapCtx.strokeStyle=crgb(hsCm,t);mapCtx.lineWidth=2.5;mapCtx.lineCap='round';
+      mapCtx.moveTo(x1+2,y1+2);mapCtx.lineTo(x2+2,y2+2);mapCtx.stroke();
+    }
+    // Label
+    mapCtx.fillStyle=light?'rgba(50,50,50,0.8)':'rgba(255,255,255,0.5)';
+    mapCtx.font='bold 9px sans-serif';
+    mapCtx.textAlign='left';mapCtx.textBaseline='top';
+    mapCtx.fillText(`⬛ ${hsLabel||'HalfShaft'}`,6,H-18);
+  }
+
   // Lap start dot
   if(lapLa.length>0){
     const[x,y]=proj(lapLa[0],lapLo[0]);
     mapCtx.beginPath();mapCtx.arc(x,y,6,0,Math.PI*2);
     mapCtx.fillStyle='#4caf50';mapCtx.fill();mapCtx.strokeStyle='#fff';mapCtx.lineWidth=1.5;mapCtx.stroke();
   }
+}
+
+// Draw just the crosshair dot on the map (without redrawing entire map)
+function drawMapCrosshairDot(idx){
+  if(!lastMapState)return;
+  const{lapLa,lapLo,proj,light}=lastMapState;
+  if(idx<0||idx>=lapLa.length)return;
+  const[x,y]=proj(lapLa[idx],lapLo[idx]);
+  // We need to repaint the map then draw the dot on top
+  paintMapFromState();
+  mapCtx.beginPath();mapCtx.arc(x,y,7,0,Math.PI*2);
+  mapCtx.fillStyle=light?'rgba(20,20,20,0.85)':'rgba(255,255,255,0.9)';
+  mapCtx.fill();
+  mapCtx.beginPath();mapCtx.arc(x,y,5,0,Math.PI*2);
+  mapCtx.fillStyle='#ff3c3c';mapCtx.fill();
+  mapCtx.strokeStyle='#fff';mapCtx.lineWidth=1.5;mapCtx.stroke();
+}
+
+function paintMapFromState(){
+  if(!lastMapState)return;
+  const{lapLa,lapLo,lapVals,cmin,cmax,cmapName,hsVals,hsLabel}=lastMapState;
+  paintMap(lapLa,lapLo,lapVals,cmin,cmax,cmapName,hsVals,hsLabel);
 }
 
 function setGpsLog(idx){
@@ -587,12 +732,22 @@ function setGpsLog(idx){
 // ════════════════════════════════════════════════════
 // CHARTS
 // ════════════════════════════════════════════════════
-const BASE_OPTS={responsive:true,maintainAspectRatio:false,animation:false,
-  plugins:{legend:{display:false},tooltip:{enabled:false}},
-  scales:{x:{type:'linear',grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#444',font:{size:9},maxTicksLimit:8}},
-          y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#444',font:{size:9},maxTicksLimit:5}}}};
+function getThemeColors(){
+  const light=document.body.classList.contains('light');
+  return{
+    grid:light?'rgba(0,0,0,0.07)':'rgba(255,255,255,0.05)',
+    tick:light?'#888':'#444',
+    title:light?'#666':'#444',
+  };
+}
 
-function opts(){return JSON.parse(JSON.stringify(BASE_OPTS));}
+function opts(){
+  const tc=getThemeColors();
+  return{responsive:true,maintainAspectRatio:false,animation:false,
+    plugins:{legend:{display:false},tooltip:{enabled:false}},
+    scales:{x:{type:'linear',grid:{color:tc.grid},ticks:{color:tc.tick,font:{size:9},maxTicksLimit:8}},
+            y:{grid:{color:tc.grid},ticks:{color:tc.tick,font:{size:9},maxTicksLimit:5}}}};
+}
 
 function mkOrUp(id,data,o){
   if(charts[id]){charts[id].data=data;charts[id].options=o;charts[id].update('none');return charts[id];}
@@ -692,7 +847,12 @@ function doUpdate(){
   const validM=mapChan.filter(v=>!isNaN(v));
   const cmin=validM.length?Math.min(...validM):0;
   const cmax=validM.length?Math.max(...validM):1;
-  paintMap(gv.lat,gv.lon,mapChan,cmin,cmax===cmin?cmin+1:cmax,cmapStr);
+  // Halfshaft overlay
+  const hsSel=$('halfshaftSel').value;
+  let hsVals=null,hsLabel=null;
+  if(hsSel==='hsl'){hsVals=ch(gv.cd,I.HSL);hsLabel='HalfShaft L';}
+  else if(hsSel==='hsr'){hsVals=ch(gv.cd,I.HSR);hsLabel='HalfShaft R';}
+  paintMap(gv.lat,gv.lon,mapChan,cmin,cmax===cmin?cmin+1:cmax,cmapStr,hsVals,hsLabel);
   drawColorBar(cmapStr,cmin,cmax===cmin?cmin+1:cmax);
   $('mapTitle').textContent=CHAN_NAMES[chanSel];
   $('mapSub').textContent=allLaps[gpsLapIdx].label;
@@ -701,9 +861,10 @@ function doUpdate(){
 
   const priLabel=allLaps[selPri].label;
   const cmpLabel=cv?allLaps[selCmp].label:null;
+  const tc=getThemeColors();
 
   {
-    const o=opts();o.scales.x.title={display:true,text:xLbl,color:'#444',font:{size:9}};
+    const o=opts();o.scales.x.title={display:true,text:xLbl,color:tc.title,font:{size:9}};
     const ds=[mkDS(pX,pWS,C.spd.pri,false,false,'y')];
     const leg=[{label:priLabel,color:C.spd.pri,dashed:false}];
     if(cv){ds.push(mkDS(cX,cWS,C.spd.cmp,true,false,'y'));leg.push({label:cmpLabel,color:C.spd.cmp,dashed:true});}
@@ -711,7 +872,7 @@ function doUpdate(){
   }
 
   {
-    const o=opts();o.scales.x.title={display:true,text:xLbl,color:'#444',font:{size:9}};o.scales.y.min=0;o.scales.y.max=100;
+    const o=opts();o.scales.x.title={display:true,text:xLbl,color:tc.title,font:{size:9}};o.scales.y.min=0;o.scales.y.max=100;
     const ds=[mkDS(pX,pTPS,C.tps.pri,false,true,'y')];
     const leg=[{label:priLabel,color:C.tps.pri,dashed:false}];
     if(cv){ds.push(mkDS(cX,cTPS,C.tps.cmp,true,false,'y'));leg.push({label:cmpLabel,color:C.tps.cmp,dashed:true});}
@@ -719,7 +880,7 @@ function doUpdate(){
   }
 
   {
-    const o=opts();o.scales.x.title={display:true,text:xLbl,color:'#444',font:{size:9}};
+    const o=opts();o.scales.x.title={display:true,text:xLbl,color:tc.title,font:{size:9}};
     const ds=[
       mkDS(pX,pFB,C.fbrk.pri,false,true,'y'),
       mkDS(pX,pRB,C.rbrk.pri,false,false,'y'),
@@ -737,8 +898,8 @@ function doUpdate(){
 
   {
     const o=opts();
-    o.scales.x.title={display:true,text:xLbl,color:'#444',font:{size:9}};
-    o.scales.y.title={display:true,text:`${CHAN_NAMES[chanSel]} (${CHAN_UNITS[chanSel]})`,color:'#444',font:{size:9}};
+    o.scales.x.title={display:true,text:xLbl,color:tc.title,font:{size:9}};
+    o.scales.y.title={display:true,text:`${CHAN_NAMES[chanSel]} (${CHAN_UNITS[chanSel]})`,color:tc.title,font:{size:9}};
     const ds=[mkDS(pX,pChan,C.trace.pri,false,false,'y')];
     const leg=[{label:priLabel,color:C.trace.pri,dashed:false}];
     if(cv){ds.push(mkDS(cX,cChan,C.trace.cmp,true,false,'y'));leg.push({label:cmpLabel,color:C.trace.cmp,dashed:true});}
@@ -749,9 +910,9 @@ function doUpdate(){
 
   {
     const o={...opts(),scales:{
-      x:{type:'linear',grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#444',font:{size:9},maxTicksLimit:8},title:{display:true,text:xLbl,color:'#444',font:{size:9}}},
-      y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#444',font:{size:9},maxTicksLimit:6},position:'left',title:{display:true,text:'Gear',color:'#444',font:{size:9}}},
-      y2:{position:'right',grid:{drawOnChartArea:false},ticks:{color:C.rpm.pri,font:{size:9},maxTicksLimit:6},title:{display:true,text:'RPM/1000',color:'#444',font:{size:9}}}
+      x:{type:'linear',grid:{color:tc.grid},ticks:{color:tc.tick,font:{size:9},maxTicksLimit:8},title:{display:true,text:xLbl,color:tc.title,font:{size:9}}},
+      y:{grid:{color:tc.grid},ticks:{color:tc.tick,font:{size:9},maxTicksLimit:6},position:'left',title:{display:true,text:'Gear',color:tc.title,font:{size:9}}},
+      y2:{position:'right',grid:{drawOnChartArea:false},ticks:{color:C.rpm.pri,font:{size:9},maxTicksLimit:6},title:{display:true,text:'RPM/1000',color:tc.title,font:{size:9}}}
     }};
     const ds=[
       mkDS(pX,pGear,C.gear.pri,false,false,'y'),
@@ -854,6 +1015,12 @@ function doUpdate(){
     ${analysisHtml}
     ${cmpHtml}
   `;
+
+  // Store data for crosshair system
+  storeCrosshairData({pX,pv,cv,cX,pTPS,pWS,pFB,pRB,pRPM,pGear,pChan,
+    cTPS,cWS,cFB,cRB,cRPM,cGear,cChan,chanSel,useTime});
+  // Attach listeners (idempotent)
+  attachCrosshairListeners();
 }
 
 // ════════════════════════════════════════════════════
@@ -918,9 +1085,10 @@ function updateSliceLabels(){
 function drawSlicePreview(){
   if(!sessions.length)return;
   slicePreviewActive=true;
+  const light=document.body.classList.contains('light');
   const W=mapCanvas.width, H=mapCanvas.height;
   mapCtx.clearRect(0,0,W,H);
-  mapCtx.fillStyle='#0e0e0e';
+  mapCtx.fillStyle=light?'#e8e4dc':'#0e0e0e';
   mapCtx.fillRect(0,0,W,H);
 
   const allLa=[...bgLats], allLo=[...bgLons];
@@ -1097,6 +1265,134 @@ function drawSlicePreviewWithGhost(origR0, origR1){
 }
 
 // ════════════════════════════════════════════════════
+// CROSSHAIR SYSTEM
+// ════════════════════════════════════════════════════
+// State: current crosshair data (set by doUpdate)
+let crosshairData=null; // {pX,pv,cv,cX,pTPS,pWS,pFB,pRB,pRPM,pGear,pChan,cTPS,cWS,cFB,cRB,cRPM,cGear,cChan,chanSel,useTime}
+
+// Call after doUpdate to store data for crosshair
+function storeCrosshairData(d){crosshairData=d;}
+
+// Find nearest index in xVec to value x
+function nearestIdx(xVec,x){
+  let best=0,bestD=Infinity;
+  for(let i=0;i<xVec.length;i++){const d=Math.abs(xVec[i]-x);if(d<bestD){bestD=d;best=i;}}
+  return best;
+}
+
+// Draw crosshair vertical lines on all Chart.js charts
+function drawCrosshairLines(xVal){
+  const chartIds=['spdChart','tpsChart','brkChart','traceChart','gearChart'];
+  chartIds.forEach(id=>{
+    const ch=charts[id];if(!ch)return;
+    const xScale=ch.scales.x;if(!xScale)return;
+    const px=xScale.getPixelForValue(xVal);
+    const area=ch.chartArea;
+    if(px<area.left||px>area.right)return;
+    const ctx=ch.ctx;
+    ctx.save();
+    ctx.beginPath();
+    ctx.strokeStyle='rgba(255,60,60,0.75)';
+    ctx.lineWidth=1.2;
+    ctx.setLineDash([4,3]);
+    ctx.moveTo(px,area.top);
+    ctx.lineTo(px,area.bottom);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  });
+}
+
+function clearCrosshairLines(){
+  const chartIds=['spdChart','tpsChart','brkChart','traceChart','gearChart'];
+  chartIds.forEach(id=>{const ch=charts[id];if(ch)ch.draw();});
+}
+
+function showCrosshairTooltip(e,xVal,idx){
+  if(!crosshairData)return;
+  const d=crosshairData;
+  const fmt1=v=>isNaN(v)?'—':v.toFixed(1);
+  const fmt0=v=>isNaN(v)?'—':v.toFixed(0);
+  const xLabel=d.useTime?`${xVal.toFixed(2)}s`:`${xVal.toFixed(1)}m`;
+  const tps=d.pTPS[idx];
+  const spd=d.pWS[idx];
+  const fb=d.pFB[idx];
+  const rb=d.pRB[idx];
+  const gear=d.pGear[idx];
+  const rpm=d.pRPM[idx];
+  const chan=d.pChan[idx];
+
+  let rows=`<div class="ct-head">${d.useTime?'Time':'Dist'}: ${xLabel}</div>`;
+  rows+=`<div class="ct-row"><span class="ct-key">TPS</span><span class="ct-val">${fmt1(tps)}%</span></div>`;
+  rows+=`<div class="ct-row"><span class="ct-key">Speed</span><span class="ct-val">${fmt1(spd)} mph</span></div>`;
+  if(!isNaN(fb)) rows+=`<div class="ct-row"><span class="ct-key">Brk F</span><span class="ct-val">${fmt0(fb)} psi</span></div>`;
+  if(!isNaN(rb)) rows+=`<div class="ct-row"><span class="ct-key">Brk R</span><span class="ct-val">${fmt0(rb)} psi</span></div>`;
+  rows+=`<div class="ct-row"><span class="ct-key">Gear</span><span class="ct-val">${isNaN(gear)?'—':gear.toFixed(0)}</span></div>`;
+  rows+=`<div class="ct-row"><span class="ct-key">RPM</span><span class="ct-val">${fmt0(rpm)}</span></div>`;
+  if(d.chanSel!==0&&d.chanSel!==8&&d.chanSel!==9) // Don't duplicate TPS/RPM/Gear
+    rows+=`<div class="ct-row"><span class="ct-key">${CHAN_NAMES[d.chanSel]}</span><span class="ct-val">${fmt1(chan)} ${CHAN_UNITS[d.chanSel]}</span></div>`;
+
+  const tt=$('crosshairTooltip');
+  tt.innerHTML=rows;
+  tt.style.display='block';
+  let lx=e.clientX+14,ly=e.clientY-10;
+  const tw=tt.offsetWidth||160,th=tt.offsetHeight||120;
+  if(lx+tw>window.innerWidth-8) lx=e.clientX-tw-10;
+  if(ly+th>window.innerHeight-8) ly=e.clientY-th-10;
+  tt.style.left=lx+'px';tt.style.top=ly+'px';
+}
+
+function hideCrosshairTooltip(){
+  $('crosshairTooltip').style.display='none';
+}
+
+// Attach mouse listeners to chart canvases
+function attachCrosshairListeners(){
+  const chartIds=['spdChart','tpsChart','brkChart','traceChart','gearChart'];
+  chartIds.forEach(id=>{
+    const canvas=$(id);
+    if(!canvas||canvas._crosshairAttached)return;
+    canvas._crosshairAttached=true;
+
+    canvas.addEventListener('mousemove',e=>{
+      const ch=charts[id];if(!ch||!crosshairData)return;
+      const rect=canvas.getBoundingClientRect();
+      const mx=e.clientX-rect.left;
+      const xScale=ch.scales.x;if(!xScale)return;
+      const xVal=xScale.getValueForPixel(mx);
+      const area=ch.chartArea;
+      if(mx<area.left||mx>area.right){hideCrosshairTooltip();clearCrosshairLines();paintMapFromState();return;}
+      // Find nearest point
+      const idx=nearestIdx(crosshairData.pX,xVal);
+      // Redraw all charts to clear previous crosshair, then draw new one
+      clearCrosshairLines();
+      drawCrosshairLines(xVal);
+      // Update map dot
+      drawMapCrosshairDot(idx);
+      showCrosshairTooltip(e,xVal,idx);
+    });
+
+    canvas.addEventListener('mouseleave',()=>{
+      hideCrosshairTooltip();
+      clearCrosshairLines();
+      paintMapFromState();
+    });
+  });
+}
+
+// ════════════════════════════════════════════════════
+// LIGHT MODE TOGGLE
+// ════════════════════════════════════════════════════
+function toggleLightMode(){
+  const light=document.body.classList.toggle('light');
+  $('lightModeBtn').textContent=light?'● Dark':'☀ Light';
+  // Repaint map with new bg color
+  paintMapFromState();
+  // Redraw charts with new theme
+  doUpdate();
+}
+
+// ════════════════════════════════════════════════════
 // BUTTON HANDLERS
 // ════════════════════════════════════════════════════
 
@@ -1194,6 +1490,7 @@ document.addEventListener('drop',e=>{
 $('chanSel').addEventListener('change',doUpdate);
 $('cmapSel').addEventListener('change',doUpdate);
 $('xaxSel').addEventListener('change',doUpdate);
+$('halfshaftSel').addEventListener('change',doUpdate);
 
 // ── Slicer events ──
 function getEditGhost(){
