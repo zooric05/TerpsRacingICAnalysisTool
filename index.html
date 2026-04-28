@@ -507,14 +507,6 @@ function parseRows(rows,name,skipFirst=false){
 
   if(gpsRows.length<2||chanRows.length<2)return null;
 
-  // ── Sanitize channels with known physical ranges before filling ──
-  // HSL (idx 20) and HSR (idx 21) are 0-100 scale; out-of-range values are bad sensor data
-  const HS_MIN=0, HS_MAX=100;
-  for(const row of chanRows){
-    if(!isNaN(row.vals[20])&&(row.vals[20]<HS_MIN||row.vals[20]>HS_MAX)) row.vals[20]=NaN;
-    if(!isNaN(row.vals[21])&&(row.vals[21]<HS_MIN||row.vals[21]>HS_MAX)) row.vals[21]=NaN;
-  }
-
   // ── Forward-fill NaN gaps per channel so interpolation is clean ──
   const nChans=CHAN_COL.length;
   const filledChan=chanRows.map(r=>r.vals.slice());
