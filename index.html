@@ -501,33 +501,32 @@ function parseCSV(text,name){
   return parseRows([lines[0].split(','),...lines.slice(1).map(l=>l.split(','))],name,true);
 }
 function parseRows(rows,name,skipFirst=false){
-  // ── Two-pass: separate full-rate channel stream (25 Hz) from GPS stream (10 Hz) ──
-  // Charts use the full-rate channel stream directly.
-  // The GPS map uses channel values interpolated to GPS timestamps.
   const start=skipFirst?0:1;
 
-  const chanRows=[];  // full rate: {t, vals[]}
-  const gpsRows=[];   // GPS rate:  {t, la, lo}
+  // Full-rate channel stream (all rows with valid elapsed)
+  const chanRows=[];
+  // GPS-rate stream (rows with valid GPS fix) — also captures raw HS values at that tick
+  const gpsRows=[];
 
   for(let i=start;i<rows.length;i++){
     const p=rows[i];
     if(!p||p.length<2)continue;
     const t=sf(p[COL.ELAPSED-1]);
     if(isNaN(t))continue;
-
     const vals=[];
     for(const ci of CHAN_COL) vals.push(sf(p[ci-1]));
     chanRows.push({t,vals});
 
     const la=sf(p[COL.LAT-1]),lo=sf(p[COL.LON-1]);
     if(!isNaN(la)&&!isNaN(lo)&&Math.abs(la)>1&&Math.abs(lo)>0.01){
-      gpsRows.push({t,la,lo});
+      // Capture raw HS values from this exact GPS row
+      gpsRows.push({t,la,lo,hsl:vals[20],hsr:vals[21]});
     }
   }
 
   if(gpsRows.length<2||chanRows.length<2)return null;
 
-  // ── Forward-fill NaN gaps per channel so interpolation is clean ──
+  // Forward+backward fill NaN gaps per channel
   const nChans=CHAN_COL.length;
   const filledChan=chanRows.map(r=>r.vals.slice());
   for(let ci=0;ci<nChans;ci++){
@@ -536,7 +535,6 @@ function parseRows(rows,name,skipFirst=false){
       if(!isNaN(filledChan[ri][ci])) last=filledChan[ri][ci];
       else if(!isNaN(last)) filledChan[ri][ci]=last;
     }
-    // backward-fill the leading NaNs too
     last=NaN;
     for(let ri=filledChan.length-1;ri>=0;ri--){
       if(!isNaN(filledChan[ri][ci])) last=filledChan[ri][ci];
@@ -544,47 +542,59 @@ function parseRows(rows,name,skipFirst=false){
     }
   }
 
-  // Binary search: largest index where chanRows[idx].t <= tQuery
+  // Binary search helper
   function findLower(tQuery){
     let lo=0,hi=chanRows.length-1;
     while(lo<hi){const mid=(lo+hi+1)>>1;if(chanRows[mid].t<=tQuery)lo=mid;else hi=mid-1;}
     return lo;
   }
 
-  // Linearly interpolate all channels to an arbitrary timestamp
-  function interpChans(tQuery){
+  // Interpolate all channels to tQuery, then overwrite HS with raw GPS-row values
+  function interpChans(tQuery,rawHsl,rawHsr){
     const idx=findLower(tQuery);
-    if(idx>=chanRows.length-1) return filledChan[chanRows.length-1].slice();
-    const t0=chanRows[idx].t,t1=chanRows[idx+1].t;
+    const atEnd=idx>=chanRows.length-1;
+    const t0=atEnd?0:chanRows[idx].t, t1=atEnd?1:chanRows[idx+1].t;
     const frac=(t1>t0)?(tQuery-t0)/(t1-t0):0;
     const out=[];
     for(let ci=0;ci<nChans;ci++){
-      const v0=filledChan[idx][ci],v1=filledChan[idx+1][ci];
+      const v0=atEnd?filledChan[chanRows.length-1][ci]:filledChan[idx][ci];
+      const v1=atEnd?v0:filledChan[idx+1][ci];
       out.push(isNaN(v0)?v1:isNaN(v1)?v0:v0+frac*(v1-v0));
     }
+    // Overwrite halfshaft with raw sampled values from the GPS row itself
+    out[20]=rawHsl;
+    out[21]=rawHsr;
     return out;
   }
 
-  // ── Full-rate arrays for charts (use chanRows directly) ──
+  // Full-rate arrays for charts
   const chanElapsed=chanRows.map(r=>r.t);
-  const chanData=filledChan;   // already forward/backward filled
+  const chanData=filledChan;
 
-  // ── GPS-rate arrays for map (interpolate channels to GPS timestamps) ──
+  // GPS-rate arrays for map, with HS from raw GPS rows
   const lat=[],lon=[],gpsElapsed=[],gpsChanData=[];
   for(const g of gpsRows){
-    lat.push(g.la);
-    lon.push(g.lo);
-    gpsElapsed.push(g.t);
-    gpsChanData.push(interpChans(g.t));
+    lat.push(g.la); lon.push(g.lo); gpsElapsed.push(g.t);
+    gpsChanData.push(interpChans(g.t,g.hsl,g.hsr));
   }
 
-  // elapsed = full-rate for chart use; lat/lon/gpsElapsed/gpsChanData = map use
+  // For charts: replace HS columns in full-rate data with GPS-rate values
+  // by forward-filling raw GPS HS values across the full-rate rows between GPS ticks
+  let gi=0;
+  for(let ri=0;ri<chanData.length;ri++){
+    const t=chanRows[ri].t;
+    // Advance GPS pointer to the last GPS row at or before this time
+    while(gi<gpsRows.length-1&&gpsRows[gi+1].t<=t) gi++;
+    chanData[ri][20]=gpsRows[gi].hsl;
+    chanData[ri][21]=gpsRows[gi].hsr;
+  }
+
   return{
-    lat, lon,
-    elapsed: chanElapsed,      // full-rate timestamps (used by charts)
-    chanData,                   // full-rate channel data (used by charts)
-    gpsElapsed,                 // GPS-rate timestamps (used by map/lap slicer)
-    gpsChanData,                // channel values interpolated to GPS timestamps (map coloring)
+    lat,lon,
+    elapsed:chanElapsed,
+    chanData,
+    gpsElapsed,
+    gpsChanData,
     fileName:name
   };
 }
@@ -602,7 +612,7 @@ function detectLaps(){
   allLaps=[];
   for(let si=0;si<sessions.length;si++){
     const sess=sessions[si];
-    const n=sess.lat.length; // GPS-rate length — r0/r1 always index GPS arrays
+    const n=sess.lat.length;
     const durS=(sess.gpsElapsed[n-1]-sess.gpsElapsed[0])*60;
     allLaps.push({sessIdx:si,r0:0,r1:n-1,label:`[L${si+1}] Full Session ${fmtT(durS)}`,durS});
   }
@@ -892,12 +902,11 @@ function cumDist(lat,lon){
 // ════════════════════════════════════════════════════
 function lapVec(lapIdx){
   if(lapIdx<0||lapIdx>=allLaps.length)return null;
-  const lap=allLaps[lapIdx];
-  const{sessIdx,r0,r1}=lap;
+  const{sessIdx,r0,r1}=allLaps[lapIdx];
   const sess=sessions[sessIdx];
   if(!sess||r1<=r0+1)return null;
 
-  // GPS-rate data (map path + coloring) — r0/r1 index into gpsElapsed/lat/lon
+  // GPS-rate data for map
   const lat=sess.lat.slice(r0,r1+1);
   const lon=sess.lon.slice(r0,r1+1);
   const gpsT0=sess.gpsElapsed[r0];
@@ -905,16 +914,16 @@ function lapVec(lapIdx){
   const gpsCd=sess.gpsChanData.slice(r0,r1+1);
   const dist=cumDist(lat,lon);
 
-  // Full-rate data (charts) — find chanData rows in the same time window
-  const tMin=sess.gpsElapsed[r0], tMax=sess.gpsElapsed[r1];
-  let ci0=0, ci1=sess.elapsed.length-1;
-  while(ci0<sess.elapsed.length-1 && sess.elapsed[ci0]<tMin) ci0++;
-  while(ci1>0 && sess.elapsed[ci1]>tMax) ci1--;
+  // Full-rate data for charts
+  const tMin=sess.gpsElapsed[r0],tMax=sess.gpsElapsed[r1];
+  let ci0=0,ci1=sess.elapsed.length-1;
+  while(ci0<sess.elapsed.length-1&&sess.elapsed[ci0]<tMin)ci0++;
+  while(ci1>0&&sess.elapsed[ci1]>tMax)ci1--;
   const chanT0=sess.elapsed[ci0];
   const t=sess.elapsed.slice(ci0,ci1+1).map(v=>(v-chanT0)*60);
   const cd=sess.chanData.slice(ci0,ci1+1);
 
-  // Resample GPS-rate cumulative distance onto the full-rate time axis
+  // Resample distance to full-rate time axis
   const gpsTabs=sess.gpsElapsed.slice(r0,r1+1);
   const tTabs=sess.elapsed.slice(ci0,ci1+1);
   function interpDist(tAbs){
