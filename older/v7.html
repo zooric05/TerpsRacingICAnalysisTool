@@ -481,80 +481,19 @@ function parseCSV(text,name){
   return parseRows([lines[0].split(','),...lines.slice(1).map(l=>l.split(','))],name,true);
 }
 function parseRows(rows,name,skipFirst=false){
-  // ── Two-pass approach: separate GPS stream (10 Hz) from channel stream (25 Hz) ──
-  // Pass 1: collect ALL rows with valid elapsed time into channel stream,
-  //         and separately collect rows with valid GPS fixes.
+  const lat=[],lon=[],elapsed=[],chanData=[];
   const start=skipFirst?0:1;
-
-  // Channel stream: every row that has a valid elapsed timestamp
-  const chanRows=[];   // {t, vals[]}
-  // GPS stream: rows that also have a valid GPS fix
-  const gpsRows=[];    // {t, la, lo}
-
   for(let i=start;i<rows.length;i++){
     const p=rows[i];
-    if(!p||p.length<2)continue;
-    const t=sf(p[COL.ELAPSED-1]);
-    if(isNaN(t))continue;
-
-    // Channel values (may be NaN if not sampled this row — that's fine)
-    const vals=[];
-    for(const ci of CHAN_COL) vals.push(sf(p[ci-1]));
-    chanRows.push({t,vals});
-
-    // GPS fix (only present at 10 Hz rows)
+    if(!p||p.length<Math.max(COL.LAT,COL.LON))continue;
     const la=sf(p[COL.LAT-1]),lo=sf(p[COL.LON-1]);
-    if(!isNaN(la)&&!isNaN(lo)&&Math.abs(la)>1&&Math.abs(lo)>0.01){
-      gpsRows.push({t,la,lo});
-    }
+    if(isNaN(la)||isNaN(lo)||Math.abs(la)<1||Math.abs(lo)<1)continue;
+    lat.push(la);lon.push(lo);
+    elapsed.push(sf(p[COL.ELAPSED-1])||0);
+    const row=[];
+    for(const ci of CHAN_COL) row.push(sf(p[ci-1]));
+    chanData.push(row);
   }
-
-  if(gpsRows.length<2||chanRows.length<2)return null;
-
-  // ── Interpolation helper: for a given timestamp t, linearly interpolate
-  //    a numeric array from the chanRows stream. ──
-  // Build per-channel arrays (with NaN gaps filled by last-known value first)
-  const nChans=CHAN_COL.length;
-  // Forward-fill NaN gaps in chanRows so interpolation doesn't produce NaN
-  const filledChan=chanRows.map(r=>r.vals.slice());
-  for(let ci=0;ci<nChans;ci++){
-    let last=NaN;
-    for(let ri=0;ri<filledChan.length;ri++){
-      if(!isNaN(filledChan[ri][ci])) last=filledChan[ri][ci];
-      else if(!isNaN(last)) filledChan[ri][ci]=last;
-    }
-  }
-
-  // Binary search: find largest index in chanRows where chanRows[idx].t <= tQuery
-  function findLower(tQuery){
-    let lo=0,hi=chanRows.length-1;
-    while(lo<hi){const mid=(lo+hi+1)>>1;if(chanRows[mid].t<=tQuery)lo=mid;else hi=mid-1;}
-    return lo;
-  }
-
-  // Interpolate all channels at time tQuery
-  function interpChans(tQuery){
-    const idx=findLower(tQuery);
-    if(idx>=chanRows.length-1) return filledChan[chanRows.length-1].slice();
-    const t0=chanRows[idx].t, t1=chanRows[idx+1].t;
-    const frac=(t1>t0)?(tQuery-t0)/(t1-t0):0;
-    const out=[];
-    for(let ci=0;ci<nChans;ci++){
-      const v0=filledChan[idx][ci],v1=filledChan[idx+1][ci];
-      out.push(isNaN(v0)?v1:isNaN(v1)?v0:v0+frac*(v1-v0));
-    }
-    return out;
-  }
-
-  // ── Build output arrays aligned to GPS timestamps ──
-  const lat=[],lon=[],elapsed=[],chanData=[];
-  for(const g of gpsRows){
-    lat.push(g.la);
-    lon.push(g.lo);
-    elapsed.push(g.t);
-    chanData.push(interpChans(g.t));
-  }
-
   return{lat,lon,elapsed,chanData,fileName:name};
 }
 
