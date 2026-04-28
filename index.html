@@ -481,15 +481,13 @@ function parseCSV(text,name){
   return parseRows([lines[0].split(','),...lines.slice(1).map(l=>l.split(','))],name,true);
 }
 function parseRows(rows,name,skipFirst=false){
-  // ── Two-pass approach: separate GPS stream (10 Hz) from channel stream (25 Hz) ──
-  // Pass 1: collect ALL rows with valid elapsed time into channel stream,
-  //         and separately collect rows with valid GPS fixes.
+  // ── Two-pass: separate full-rate channel stream (25 Hz) from GPS stream (10 Hz) ──
+  // Charts use the full-rate channel stream directly.
+  // The GPS map uses channel values interpolated to GPS timestamps.
   const start=skipFirst?0:1;
 
-  // Channel stream: every row that has a valid elapsed timestamp
-  const chanRows=[];   // {t, vals[]}
-  // GPS stream: rows that also have a valid GPS fix
-  const gpsRows=[];    // {t, la, lo}
+  const chanRows=[];  // full rate: {t, vals[]}
+  const gpsRows=[];   // GPS rate:  {t, la, lo}
 
   for(let i=start;i<rows.length;i++){
     const p=rows[i];
@@ -497,12 +495,10 @@ function parseRows(rows,name,skipFirst=false){
     const t=sf(p[COL.ELAPSED-1]);
     if(isNaN(t))continue;
 
-    // Channel values (may be NaN if not sampled this row — that's fine)
     const vals=[];
     for(const ci of CHAN_COL) vals.push(sf(p[ci-1]));
     chanRows.push({t,vals});
 
-    // GPS fix (only present at 10 Hz rows)
     const la=sf(p[COL.LAT-1]),lo=sf(p[COL.LON-1]);
     if(!isNaN(la)&&!isNaN(lo)&&Math.abs(la)>1&&Math.abs(lo)>0.01){
       gpsRows.push({t,la,lo});
@@ -511,11 +507,16 @@ function parseRows(rows,name,skipFirst=false){
 
   if(gpsRows.length<2||chanRows.length<2)return null;
 
-  // ── Interpolation helper: for a given timestamp t, linearly interpolate
-  //    a numeric array from the chanRows stream. ──
-  // Build per-channel arrays (with NaN gaps filled by last-known value first)
+  // ── Sanitize channels with known physical ranges before filling ──
+  // HSL (idx 20) and HSR (idx 21) are 0-100 scale; out-of-range values are bad sensor data
+  const HS_MIN=0, HS_MAX=100;
+  for(const row of chanRows){
+    if(!isNaN(row.vals[20])&&(row.vals[20]<HS_MIN||row.vals[20]>HS_MAX)) row.vals[20]=NaN;
+    if(!isNaN(row.vals[21])&&(row.vals[21]<HS_MIN||row.vals[21]>HS_MAX)) row.vals[21]=NaN;
+  }
+
+  // ── Forward-fill NaN gaps per channel so interpolation is clean ──
   const nChans=CHAN_COL.length;
-  // Forward-fill NaN gaps in chanRows so interpolation doesn't produce NaN
   const filledChan=chanRows.map(r=>r.vals.slice());
   for(let ci=0;ci<nChans;ci++){
     let last=NaN;
@@ -523,20 +524,26 @@ function parseRows(rows,name,skipFirst=false){
       if(!isNaN(filledChan[ri][ci])) last=filledChan[ri][ci];
       else if(!isNaN(last)) filledChan[ri][ci]=last;
     }
+    // backward-fill the leading NaNs too
+    last=NaN;
+    for(let ri=filledChan.length-1;ri>=0;ri--){
+      if(!isNaN(filledChan[ri][ci])) last=filledChan[ri][ci];
+      else if(!isNaN(last)) filledChan[ri][ci]=last;
+    }
   }
 
-  // Binary search: find largest index in chanRows where chanRows[idx].t <= tQuery
+  // Binary search: largest index where chanRows[idx].t <= tQuery
   function findLower(tQuery){
     let lo=0,hi=chanRows.length-1;
     while(lo<hi){const mid=(lo+hi+1)>>1;if(chanRows[mid].t<=tQuery)lo=mid;else hi=mid-1;}
     return lo;
   }
 
-  // Interpolate all channels at time tQuery
+  // Linearly interpolate all channels to an arbitrary timestamp
   function interpChans(tQuery){
     const idx=findLower(tQuery);
     if(idx>=chanRows.length-1) return filledChan[chanRows.length-1].slice();
-    const t0=chanRows[idx].t, t1=chanRows[idx+1].t;
+    const t0=chanRows[idx].t,t1=chanRows[idx+1].t;
     const frac=(t1>t0)?(tQuery-t0)/(t1-t0):0;
     const out=[];
     for(let ci=0;ci<nChans;ci++){
@@ -546,16 +553,28 @@ function parseRows(rows,name,skipFirst=false){
     return out;
   }
 
-  // ── Build output arrays aligned to GPS timestamps ──
-  const lat=[],lon=[],elapsed=[],chanData=[];
+  // ── Full-rate arrays for charts (use chanRows directly) ──
+  const chanElapsed=chanRows.map(r=>r.t);
+  const chanData=filledChan;   // already forward/backward filled
+
+  // ── GPS-rate arrays for map (interpolate channels to GPS timestamps) ──
+  const lat=[],lon=[],gpsElapsed=[],gpsChanData=[];
   for(const g of gpsRows){
     lat.push(g.la);
     lon.push(g.lo);
-    elapsed.push(g.t);
-    chanData.push(interpChans(g.t));
+    gpsElapsed.push(g.t);
+    gpsChanData.push(interpChans(g.t));
   }
 
-  return{lat,lon,elapsed,chanData,fileName:name};
+  // elapsed = full-rate for chart use; lat/lon/gpsElapsed/gpsChanData = map use
+  return{
+    lat, lon,
+    elapsed: chanElapsed,      // full-rate timestamps (used by charts)
+    chanData,                   // full-rate channel data (used by charts)
+    gpsElapsed,                 // GPS-rate timestamps (used by map/lap slicer)
+    gpsChanData,                // channel values interpolated to GPS timestamps (map coloring)
+    fileName:name
+  };
 }
 
 function removeSession(idx){
@@ -571,8 +590,8 @@ function detectLaps(){
   allLaps=[];
   for(let si=0;si<sessions.length;si++){
     const sess=sessions[si];
-    const n=sess.lat.length;
-    const durS=(sess.elapsed[n-1]-sess.elapsed[0])*60;
+    const n=sess.lat.length; // GPS-rate length — r0/r1 always index GPS arrays
+    const durS=(sess.gpsElapsed[n-1]-sess.gpsElapsed[0])*60;
     allLaps.push({sessIdx:si,r0:0,r1:n-1,label:`[L${si+1}] Full Session ${fmtT(durS)}`,durS});
   }
 }
@@ -861,15 +880,41 @@ function cumDist(lat,lon){
 // ════════════════════════════════════════════════════
 function lapVec(lapIdx){
   if(lapIdx<0||lapIdx>=allLaps.length)return null;
-  const{sessIdx,r0,r1}=allLaps[lapIdx];
+  const lap=allLaps[lapIdx];
+  const{sessIdx,r0,r1}=lap;
   const sess=sessions[sessIdx];
   if(!sess||r1<=r0+1)return null;
+
+  // GPS-rate data (map path + coloring) — r0/r1 index into gpsElapsed/lat/lon
   const lat=sess.lat.slice(r0,r1+1);
   const lon=sess.lon.slice(r0,r1+1);
-  const t=sess.elapsed.slice(r0,r1+1).map(v=>(v-sess.elapsed[r0])*60);
+  const gpsT0=sess.gpsElapsed[r0];
+  const gpsT=sess.gpsElapsed.slice(r0,r1+1).map(v=>(v-gpsT0)*60);
+  const gpsCd=sess.gpsChanData.slice(r0,r1+1);
   const dist=cumDist(lat,lon);
-  const cd=sess.chanData.slice(r0,r1+1);
-  return{lat,lon,t,dist,cd,si:sessIdx};
+
+  // Full-rate data (charts) — find chanData rows in the same time window
+  const tMin=sess.gpsElapsed[r0], tMax=sess.gpsElapsed[r1];
+  let ci0=0, ci1=sess.elapsed.length-1;
+  while(ci0<sess.elapsed.length-1 && sess.elapsed[ci0]<tMin) ci0++;
+  while(ci1>0 && sess.elapsed[ci1]>tMax) ci1--;
+  const chanT0=sess.elapsed[ci0];
+  const t=sess.elapsed.slice(ci0,ci1+1).map(v=>(v-chanT0)*60);
+  const cd=sess.chanData.slice(ci0,ci1+1);
+
+  // Resample GPS-rate cumulative distance onto the full-rate time axis
+  const gpsTabs=sess.gpsElapsed.slice(r0,r1+1);
+  const tTabs=sess.elapsed.slice(ci0,ci1+1);
+  function interpDist(tAbs){
+    let lo=0,hi=gpsTabs.length-1;
+    while(lo<hi){const mid=(lo+hi+1)>>1;if(gpsTabs[mid]<=tAbs)lo=mid;else hi=mid-1;}
+    if(lo>=gpsTabs.length-1)return dist[dist.length-1];
+    const f=(gpsTabs[lo+1]>gpsTabs[lo])?(tAbs-gpsTabs[lo])/(gpsTabs[lo+1]-gpsTabs[lo]):0;
+    return dist[lo]+f*(dist[lo+1]-dist[lo]);
+  }
+  const fullDist=tTabs.map(interpDist);
+
+  return{lat,lon,t,dist:fullDist,cd,gpsT,gpsCd,si:sessIdx};
 }
 function wSpd(cd){return cd.map(r=>{const a=r[I.WSRR],b=r[I.WSRL];return(isNaN(a)&&isNaN(b))?NaN:isNaN(a)?b:isNaN(b)?a:(a+b)/2;});}
 
@@ -904,15 +949,16 @@ function doUpdate(){
     return selPri;
   })();
   const gv=lapVec(gpsLapIdx)||pv;
-  const mapChan=ch(gv.cd,chanSel);
+  // Map uses GPS-rate interpolated channel data (gpsCd), not the full-rate cd
+  const mapChan=ch(gv.gpsCd,chanSel);
   const validM=mapChan.filter(v=>!isNaN(v));
   const cmin=validM.length?Math.min(...validM):0;
   const cmax=validM.length?Math.max(...validM):1;
-  // Halfshaft overlay
+  // Halfshaft overlay — also GPS-rate
   const hsSel=$('halfshaftSel').value;
   let hsVals=null,hsLabel=null;
-  if(hsSel==='hsl'){hsVals=ch(gv.cd,I.HSL);hsLabel='HalfShaft L';}
-  else if(hsSel==='hsr'){hsVals=ch(gv.cd,I.HSR);hsLabel='HalfShaft R';}
+  if(hsSel==='hsl'){hsVals=ch(gv.gpsCd,I.HSL);hsLabel='HalfShaft L';}
+  else if(hsSel==='hsr'){hsVals=ch(gv.gpsCd,I.HSR);hsLabel='HalfShaft R';}
   paintMap(gv.lat,gv.lon,mapChan,cmin,cmax===cmin?cmin+1:cmax,cmapStr,hsVals,hsLabel);
   drawColorBar(cmapStr,cmin,cmax===cmin?cmin+1:cmax);
   $('mapTitle').textContent=CHAN_NAMES[chanSel];
@@ -1079,7 +1125,8 @@ function doUpdate(){
 
   // Store data for crosshair system
   storeCrosshairData({pX,pv,cv,cX,pTPS,pWS,pFB,pRB,pRPM,pGear,pChan,
-    cTPS,cWS,cFB,cRB,cRPM,cGear,cChan,chanSel,useTime});
+    cTPS,cWS,cFB,cRB,cRPM,cGear,cChan,chanSel,useTime,
+    pGpsT:pv.gpsT});
   // Attach listeners (idempotent)
   attachCrosshairListeners();
 }
@@ -1131,10 +1178,10 @@ function updateSliceLabels(){
   sliceR1=Math.min(parseInt($('sliceEnd').value),   sess.lat.length-1);
   if(sliceR1<=sliceR0) sliceR1=Math.min(sliceR0+2, sess.lat.length-1);
 
-  const e0=sess.elapsed[sliceR0]||0;
-  const e1=sess.elapsed[sliceR1]||0;
-  const t0=(e0-sess.elapsed[0])*60;
-  const t1=(e1-sess.elapsed[0])*60;
+  const e0=sess.gpsElapsed[sliceR0]||0;
+  const e1=sess.gpsElapsed[sliceR1]||0;
+  const t0=(e0-sess.gpsElapsed[0])*60;
+  const t1=(e1-sess.gpsElapsed[0])*60;
   $('sliceStartT').textContent=fmtT(t0);
   $('sliceEndT').textContent=fmtT(t1);
   const durS=(e1-e0)*60;
@@ -1423,13 +1470,16 @@ function attachCrosshairListeners(){
       const xVal=xScale.getValueForPixel(mx);
       const area=ch.chartArea;
       if(mx<area.left||mx>area.right){hideCrosshairTooltip();clearCrosshairLines();paintMapFromState();return;}
-      // Find nearest point
+      // Find nearest point in full-rate chart data
       const idx=nearestIdx(crosshairData.pX,xVal);
+      // Map chart x-value to nearest GPS-rate index for the map dot
+      const gpsT=crosshairData.pGpsT;
+      const gpsIdx=gpsT?nearestIdx(gpsT,xVal):idx;
       // Redraw all charts to clear previous crosshair, then draw new one
       clearCrosshairLines();
       drawCrosshairLines(xVal);
-      // Update map dot
-      drawMapCrosshairDot(idx);
+      // Update map dot using GPS-rate index
+      drawMapCrosshairDot(gpsIdx);
       showCrosshairTooltip(e,xVal,idx);
     });
 
@@ -1516,7 +1566,7 @@ $('editLapApply').addEventListener('click',()=>{
   if(r1<=r0+10){alert('Select a wider range.');return;}
   const lap=allLaps[editingLapIdx];
   const sess=sessions[lap.sessIdx];
-  const durS=(sess.elapsed[r1]-sess.elapsed[r0])*60;
+  const durS=(sess.gpsElapsed[r1]-sess.gpsElapsed[r0])*60;
   lap.r0=r0; lap.r1=r1; lap.durS=durS;
   if(!lap.customName) lap.label=`[L${lap.sessIdx+1}] Manual ${fmtT(durS)}`;
   editingLapIdx=-1;
@@ -1590,7 +1640,7 @@ $('sliceAddBtn').addEventListener('click',()=>{
   const r0=sliceR0, r1=sliceR1;
   if(r1<=r0+10){alert('Select a wider range.');return;}
   const sess=sessions[sliceSess];
-  const durS=(sess.elapsed[r1]-sess.elapsed[r0])*60;
+  const durS=(sess.gpsElapsed[r1]-sess.gpsElapsed[r0])*60;
   const manN=allLaps.filter(l=>l.manual).length+1;
   allLaps.push({sessIdx:sliceSess,r0,r1,
     label:`[L${sliceSess+1}] Manual ${manN} ${fmtT(durS)}`,durS,manual:true});
