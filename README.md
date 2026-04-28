@@ -2,7 +2,9 @@
 This is a lightweight, browser-based telemetry dashboard I put together for motorsports. Basically, it lets you take the raw data from Race capture like  speed, throttle, brake pressure, and GPS coordinates and turns it into interactive track maps and charts so you can see exactly where you're losing or gaining time.
 
 ### What it does
-You can download the file, save it as .HTML and run it or visit this webpage and run it: https://tr-data-analysis-tool.netlify.app/
+You can download the file, save it as .HTML and run it or visit this webpage and run it: 
+https://tr-data-analysis-tool.netlify.app/
+
 Compare Multiple Logs: You can load up to two different RC files (that have been converted from .log to .csv) at the same time. You just pick a primary lap and a compare lap, and it overlays their data right on top of each other.
 Interactive Track Map: It automatically draws the track layout using your raw GPS coordinates. It color-codes the racing line based on what you're looking at. For example, it can color the track red in heavy braking zones or green where you are flat out.
 Manual Lap Slicer: You can use the slicer at the top to drag the start and end sliders (using the arrow buttons for fine-tuning) to highlight a specific part of the track, name it, and save it as a custom lap.
