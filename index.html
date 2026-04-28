@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Racing Analysis Tool</title>
+<title>Racing Analysis</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
@@ -96,6 +96,7 @@ select option{background:#1a1a1a}
 /* ── Content grid ── */
 #content{flex:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 195px;gap:0;overflow:hidden}
 #mapWrap{position:relative;border-right:1px solid #1a1a1a;border-bottom:1px solid #1a1a1a;overflow:hidden}
+body.light #mapWrap{border-right-color:#c4bfb5;border-bottom-color:#c4bfb5}
 #mapCanvas{width:100%;height:100%;display:block}
 #mapOverlay{position:absolute;top:7px;left:7px;background:rgba(0,0,0,.72);border:1px solid #252525;border-radius:5px;padding:4px 9px;font-size:10px;color:#999;pointer-events:none;max-width:190px}
 #mapOverlay b{color:#4caf50;display:block;font-size:10px}
@@ -110,7 +111,9 @@ select option{background:#1a1a1a}
 #cbLabels{position:absolute;right:23px;top:28px;display:flex;flex-direction:column;justify-content:space-between;height:100px;font-size:9px;color:#777;text-align:right}
 
 #chartsRight{display:flex;flex-direction:column;border-bottom:1px solid #1a1a1a;overflow:hidden}
+body.light #chartsRight{border-bottom-color:#c4bfb5}
 .cpanel{flex:1;border-bottom:1px solid #151515;position:relative;padding:18px 7px 3px 3px;min-height:0}
+body.light .cpanel{border-bottom-color:#c4bfb5}
 .cpanel:last-child{border-bottom:none}
 .ct{position:absolute;top:4px;left:9px;font-size:10px;color:#777;text-transform:uppercase;letter-spacing:.6px;z-index:2;font-weight:600;pointer-events:none}
 
@@ -150,16 +153,16 @@ canvas{display:block}
 .lf-remove:hover{color:#e05050}
 
 /* ── Light Mode ── */
-body.light{background:#f5f3ee;color:#1a1a1a}
-body.light #topbar{background:#e8e4dc;border-bottom-color:#ccc8be}
+body.light{background:#e8e4dc;color:#1a1a1a}
+body.light #topbar{background:#dedad2;border-bottom-color:#c4bfb5}
 body.light #topbar h1{color:#111}
-body.light #sidebar{background:#ede9e1;border-right-color:#ccc8be}
-body.light .sb-sec{border-bottom-color:#d8d3c8}
+body.light #sidebar{background:#dedad2;border-right-color:#c4bfb5}
+body.light .sb-sec{border-bottom-color:#c4bfb5}
 body.light .sb-lbl{color:#333}
-body.light select{background:#f0ece4;border-color:#bbb5a8;color:#222}
-body.light select option{background:#f0ece4}
-body.light .lap-scroll{background:#e8e4dc;border-color:#ccc8be}
-body.light .lap-item{color:#444;border-bottom-color:#d5d0c6}
+body.light select{background:#dedad2;border-color:#b8b3a8;color:#222}
+body.light select option{background:#dedad2}
+body.light .lap-scroll{background:#d4cfc6;border-color:#b8b3a8}
+body.light .lap-item{color:#444;border-bottom-color:#c4bfb5}
 body.light .lap-item:hover{background:#d8f0d8}
 body.light .lap-item.sel-pri{background:#c8e8c8;color:#1a7a1a;border-left-color:#2e7d32}
 body.light .lap-item.sel-cmp{background:#c8d8f0;color:#1a4a9a;border-left-color:#2a6aaa}
@@ -168,38 +171,38 @@ body.light #updateBtn:hover{background:#388e3c}
 body.light #statsBox{color:#555}
 body.light .sk{color:#555}
 body.light .sv{color:#111}
-body.light .ssep{color:#888;border-bottom-color:#d0ccc0}
-body.light .sr{border-bottom-color:#d8d3c8}
-body.light #content{background:#f5f3ee}
+body.light .ssep{color:#888;border-bottom-color:#c4bfb5}
+body.light .sr{border-bottom-color:#c4bfb5}
+body.light #content{background:#e8e4dc}
 body.light #mapWrap{background:#e8e4dc}
-body.light #mapOverlay{background:rgba(245,243,238,.92);border-color:#ccc}
+body.light #mapOverlay{background:rgba(232,228,220,.95);border-color:#bbb}
 body.light #mapOverlay b{color:#2e7d32}
-body.light #gpsSw{background:rgba(230,226,218,.95);border-color:#bbb}
+body.light #gpsSw{background:rgba(212,207,198,.95);border-color:#aaa}
 body.light .gsb{color:#888}
 body.light .gsb.a1{background:#c8e8c8;color:#1a7a1a}
 body.light .gsb.a2{background:#c8d8f0;color:#1a4a9a}
-body.light .cpanel{background:#f5f3ee}
+body.light .cpanel{background:#e8e4dc}
 body.light .ct{color:#666}
 #sliceSec{background:#111;border-bottom:1px solid #202020}
-body.light #sliceSec{background:#ede9e1;border-bottom-color:#ccc8be}
+body.light #sliceSec{background:#dedad2;border-bottom-color:#c4bfb5}
 body.light .slicer-lbl{color:#444}
-body.light .slr-btn{background:#e0dbd0;border-color:#bbb;color:#444}
-body.light .slr-btn:hover{background:#ccc;color:#111}
-body.light input[type=range].slr{background:#d5d0c6}
+body.light .slr-btn{background:#d4cfc6;border-color:#aaa;color:#444}
+body.light .slr-btn:hover{background:#bbb6ae;color:#111}
+body.light input[type=range].slr{background:#c8c3ba}
 body.light #sliceInfo{color:#777}
 body.light .lf-name{color:#333}
 body.light .lf-remove{color:#bbb}
 body.light #lb1{background:#c8e8c8;color:#1a7a1a;border-color:#7ab87a}
 body.light #lb2{background:#c8d8f0;color:#1a4a9a;border-color:#7aa8d8}
-body.light #welcomeOverlay{background:#f5f3ee}
+body.light #welcomeOverlay{background:#e8e4dc}
 body.light #welcomeOverlay h2{color:#111}
 body.light #welcomeOverlay p{color:#777}
-body.light .drop-hint{border-color:#ccc}
+body.light .drop-hint{border-color:#b8b3a8}
 body.light .drop-hint span{color:#555}
 body.light .vc.vg{background:#d8f0d8;color:#1a6a1a;border-color:#7ab87a}
 body.light .vc.vw{background:#fff0d8;color:#8a4a00;border-color:#d4a050}
 body.light .vc.vb{background:#fdd;color:#8a1a1a;border-color:#d07070}
-body.light .vc.vn{background:#e8e4dc;color:#444;border-color:#bbb}
+body.light .vc.vn{background:#d4cfc6;color:#444;border-color:#aaa}
 body.light .vc.v1{background:#d8f0d8;color:#1a6a1a;border-color:#7ab87a}
 body.light .vc.v2{background:#c8d8f0;color:#1a4a9a;border-color:#7aa8d8}
 
@@ -212,20 +215,36 @@ body.light .vc.v2{background:#c8d8f0;color:#1a4a9a;border-color:#7aa8d8}
   box-shadow:0 4px 16px rgba(0,0,0,.5);
   display:none;
 }
-body.light #crosshairTooltip{background:rgba(245,243,238,.97);border-color:#bbb;color:#222;box-shadow:0 4px 16px rgba(0,0,0,.15)}
+body.light #crosshairTooltip{background:rgba(232,228,220,.97);border-color:#aaa;color:#222;box-shadow:0 4px 16px rgba(0,0,0,.15)}
 #crosshairTooltip .ct-row{display:flex;justify-content:space-between;gap:12px}
 #crosshairTooltip .ct-key{color:#888;font-size:10px}
 body.light #crosshairTooltip .ct-key{color:#666}
 #crosshairTooltip .ct-val{color:#e0e0e0;font-weight:700;font-variant-numeric:tabular-nums}
 body.light #crosshairTooltip .ct-val{color:#111}
 #crosshairTooltip .ct-head{font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#555;margin-bottom:3px;padding-bottom:3px;border-bottom:1px solid #252525}
-body.light #crosshairTooltip .ct-head{color:#888;border-bottom-color:#d0ccc0}
+body.light #crosshairTooltip .ct-head{color:#888;border-bottom-color:#c4bfb5}
 
 /* Light mode toggle */
 #lightModeBtn{background:#1a1a1a;border:1px solid #2e2e2e;color:#777;padding:4px 10px;font-size:10px;font-weight:600;border-radius:5px;cursor:pointer;transition:all .15s;letter-spacing:.3px}
 #lightModeBtn:hover{background:#252525;color:#ccc}
-body.light #lightModeBtn{background:#e0dbd0;border-color:#bbb;color:#444}
-body.light #lightModeBtn:hover{background:#ccc;color:#111}
+body.light #lightModeBtn{background:#d4cfc6;border-color:#aaa;color:#444}
+body.light #lightModeBtn:hover{background:#bbb6ae;color:#111}
+
+/* ── Light mode buttons ── */
+body.light #loadBtn{background:#2e7d32;border-color:#1b5e20;color:#e8f5e9}
+body.light #loadBtn:hover{background:#388e3c}
+body.light #updateBtn{background:#2e7d32;border-color:#1b5e20;color:#e8f5e9}
+body.light #updateBtn:hover{background:#388e3c}
+body.light #sliceAddBtn{background:#c8e8c8 !important;border-color:#2e7d32 !important;color:#1a5c1a !important}
+body.light #sliceAddBtn:not([disabled]):hover{background:#a8d8a8 !important}
+body.light #sliceAddBtn[disabled]{background:#dedad2 !important;border-color:#c4bfb5 !important;color:#aaa !important}
+body.light #sliceClearBtn{background:#dedad2 !important;border-color:#c4bfb5 !important;color:#666 !important}
+body.light #sliceClearBtn:hover{background:#d4cfc6 !important;color:#333 !important}
+body.light #lapNameSave{background:#2e7d32 !important;border-color:#1b5e20 !important;color:#e8f5e9 !important}
+body.light #lapNameInput{background:#e8e4dc !important;border-color:#c4bfb5 !important;color:#222 !important}
+body.light #editLapBtn{background:#c8d8f0 !important;border-color:#2a6aaa !important;color:#1a3a7a !important}
+body.light #editLapApply{background:#c8ecf8 !important;border-color:#2a6a8a !important;color:#0a4a6a !important}
+body.light #editLapDelete{background:#fdd !important;border-color:#c07070 !important;color:#8a1a1a !important}
 </style>
 </head>
 <body>
@@ -234,7 +253,7 @@ body.light #lightModeBtn:hover{background:#ccc;color:#111}
 
 <div id="welcomeOverlay">
   <svg width="42" height="42" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="23" stroke="#2e7d32" stroke-width="1.5"/><path d="M12 28 Q18 14 24 20 Q30 26 36 12" stroke="#4caf50" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="24" cy="24" r="3" fill="#4caf50"/></svg>
-  <h2>Racing Analysis Tool</h2>
+  <h2>Racing Analysis</h2>
   <p>Load up to two CSV or XLSX telemetry logs. Both logs overlay all charts for direct comparison. Use the lap slicer to section out laps.</p>
   <div class="drop-hint" id="welcomeLoadBtn">
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4caf50" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
