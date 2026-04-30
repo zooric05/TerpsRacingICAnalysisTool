@@ -3,7 +3,7 @@ This is a lightweight, browser-based telemetry dashboard I put together for moto
 
 ### What it does
 You can download the file, save it as .HTML and run it or visit this webpage and run it: 
-https://tr-data-analysis-tool.netlify.app/
+https://terpsracingicanalysistool.netlify.app/
 
 Compare Multiple Logs: You can load up to two different RC files (that have been converted from .log to .csv) at the same time. You just pick a primary lap and a compare lap, and it overlays their data right on top of each other.
 Interactive Track Map: It automatically draws the track layout using your raw GPS coordinates. It color-codes the racing line based on what you're looking at. For example, it can color the track red in heavy braking zones or green where you are flat out.
