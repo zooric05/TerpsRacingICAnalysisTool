@@ -245,19 +245,6 @@ body.light #lapNameInput{background:#ffffff !important;border-color:#d0d0d0 !imp
 body.light #editLapBtn{background:#c8d8f0 !important;border-color:#2a6aaa !important;color:#1a3a7a !important}
 body.light #editLapApply{background:#c8ecf8 !important;border-color:#2a6a8a !important;color:#0a4a6a !important}
 body.light #editLapDelete{background:#fdd !important;border-color:#c07070 !important;color:#8a1a1a !important}
-
-/* X-axis toggle buttons */
-.xax-btn-group{display:flex;gap:3px;margin-top:4px}
-.xax-btn{flex:1;background:#1a1a1a;border:1px solid #2a2a2a;color:#666;padding:3px 4px;font-size:10px;font-weight:600;border-radius:4px;cursor:pointer;transition:all .12s;text-align:center}
-.xax-btn:hover{background:#252525;color:#aaa}
-.xax-btn.active-dist{background:#0d2a1a;border-color:#2e7d32;color:#4caf50}
-.xax-btn.active-time{background:#1a1a2e;border-color:#3a3aaa;color:#7a7aff}
-.xax-btn.active-rpm{background:#2a1a0a;border-color:#8a4a00;color:#e8943a}
-body.light .xax-btn{background:#f0f0f0;border-color:#d0d0d0;color:#888}
-body.light .xax-btn:hover{background:#e0e0e0;color:#444}
-body.light .xax-btn.active-dist{background:#d8f0d8;border-color:#2e7d32;color:#1a6a1a}
-body.light .xax-btn.active-time{background:#d8d8f8;border-color:#5a5aaa;color:#2a2a9a}
-body.light .xax-btn.active-rpm{background:#fff0d8;border-color:#d4a050;color:#8a4a00}
 </style>
 </head>
 <body>
@@ -386,11 +373,10 @@ body.light .xax-btn.active-rpm{background:#fff0d8;border-color:#d4a050;color:#8a
 
     <div class="sb-sec">
       <div class="sb-lbl">X Axis</div>
-      <div class="xax-btn-group">
-        <button class="xax-btn active-dist" id="xbDist" onclick="setXAxis('dist')">Dist</button>
-        <button class="xax-btn" id="xbTime" onclick="setXAxis('time')">Time</button>
-        <button class="xax-btn" id="xbRpm" onclick="setXAxis('rpm')">RPM</button>
-      </div>
+      <select id="xaxSel">
+        <option value="dist">Distance (m)</option>
+        <option value="time">Time (s)</option>
+      </select>
     </div>
 
     <div class="sb-sec" style="border-bottom:none">
@@ -451,6 +437,7 @@ const CHAN_UNITS=['%','mph','mph','mph','mph','psi','psi','kph','rpm','#','deg',
 const CHAN_COL=[COL.TPS,COL.WSRR,COL.WSRL,COL.WSFL,COL.WSFR,COL.FRTBRK,COL.REARBRK,COL.SPEED,COL.RPM,COL.GEAR,COL.STEER,COL.ACCELX,COL.ACCELY,COL.GSUM,COL.LAMBDA,COL.EOP,COL.MAP,COL.ENGTMP,COL.TCCUT,COL.BRKBAL,COL.HSL,COL.HSR];
 const I={TPS:0,WSRR:1,WSRL:2,WSFL:3,WSFR:4,FB:5,RB:6,SPD:7,RPM:8,GEAR:9,STEER:10,AX:11,AY:12,GSUM:13,TC:18,HSL:20,HSR:21};
 
+// Distinct colors: PRIMARY solid, COMPARE dashed — each with its own hue
 const C={
   spd:  {pri:'#3ddc5a', cmp:'#22ddcc'},
   tps:  {pri:'#b5e83a', cmp:'#ffd040'},
@@ -464,12 +451,11 @@ const C={
 // ════════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════════
-let sessions=[];
-let allLaps=[];
+let sessions=[];          // {lat,lon,elapsed,chanData,fileName}[]  max 2
+let allLaps=[];           // {sessIdx,r0,r1,label,durS}[]
 let selPri=-1, selCmp=-1;
 let charts={};
-let mapGpsLog=0;
-let xAxisMode='dist'; // 'dist' | 'time' | 'rpm'
+let mapGpsLog=0;          // 0|1
 
 // ════════════════════════════════════════════════════
 // UTILS
@@ -479,19 +465,6 @@ const sf=v=>{if(v===undefined||v===null||v==='')return NaN;const n=parseFloat(St
 const avg=a=>{const v=a.filter(x=>!isNaN(x));return v.length?v.reduce((s,x)=>s+x,0)/v.length:NaN;};
 const maxV=a=>{const v=a.filter(x=>!isNaN(x));return v.length?Math.max(...v):NaN;};
 const fmtT=s=>{const m=Math.floor(s/60);return`${String(m).padStart(2,'0')}:${(s-m*60).toFixed(2).padStart(5,'0')}`;};
-
-// ════════════════════════════════════════════════════
-// X AXIS MODE
-// ════════════════════════════════════════════════════
-function setXAxis(mode){
-  xAxisMode=mode;
-  ['Dist','Time','Rpm'].forEach(n=>{
-    const btn=$('xb'+n);
-    if(!btn)return;
-    btn.className='xax-btn'+(mode===n.toLowerCase()?' active-'+n.toLowerCase():'');
-  });
-  doUpdate();
-}
 
 // ════════════════════════════════════════════════════
 // FILE LOADING
@@ -529,7 +502,10 @@ function parseCSV(text,name){
 }
 function parseRows(rows,name,skipFirst=false){
   const start=skipFirst?0:1;
+
+  // Full-rate channel stream (all rows with valid elapsed)
   const chanRows=[];
+  // GPS-rate stream (rows with valid GPS fix) — also captures raw HS values at that tick
   const gpsRows=[];
 
   for(let i=start;i<rows.length;i++){
@@ -543,12 +519,14 @@ function parseRows(rows,name,skipFirst=false){
 
     const la=sf(p[COL.LAT-1]),lo=sf(p[COL.LON-1]);
     if(!isNaN(la)&&!isNaN(lo)&&Math.abs(la)>1&&Math.abs(lo)>0.01){
+      // Capture raw HS values from this exact GPS row
       gpsRows.push({t,la,lo,hsl:vals[20],hsr:vals[21]});
     }
   }
 
   if(gpsRows.length<2||chanRows.length<2)return null;
 
+  // Forward+backward fill NaN gaps per channel
   const nChans=CHAN_COL.length;
   const filledChan=chanRows.map(r=>r.vals.slice());
   for(let ci=0;ci<nChans;ci++){
@@ -564,12 +542,14 @@ function parseRows(rows,name,skipFirst=false){
     }
   }
 
+  // Binary search helper
   function findLower(tQuery){
     let lo=0,hi=chanRows.length-1;
     while(lo<hi){const mid=(lo+hi+1)>>1;if(chanRows[mid].t<=tQuery)lo=mid;else hi=mid-1;}
     return lo;
   }
 
+  // Interpolate all channels to tQuery, then overwrite HS with raw GPS-row values
   function interpChans(tQuery,rawHsl,rawHsr){
     const idx=findLower(tQuery);
     const atEnd=idx>=chanRows.length-1;
@@ -581,29 +561,42 @@ function parseRows(rows,name,skipFirst=false){
       const v1=atEnd?v0:filledChan[idx+1][ci];
       out.push(isNaN(v0)?v1:isNaN(v1)?v0:v0+frac*(v1-v0));
     }
+    // Overwrite halfshaft with raw sampled values from the GPS row itself
     out[20]=rawHsl;
     out[21]=rawHsr;
     return out;
   }
 
+  // Full-rate arrays for charts
   const chanElapsed=chanRows.map(r=>r.t);
   const chanData=filledChan;
 
+  // GPS-rate arrays for map, with HS from raw GPS rows
   const lat=[],lon=[],gpsElapsed=[],gpsChanData=[];
   for(const g of gpsRows){
     lat.push(g.la); lon.push(g.lo); gpsElapsed.push(g.t);
     gpsChanData.push(interpChans(g.t,g.hsl,g.hsr));
   }
 
+  // For charts: replace HS columns in full-rate data with GPS-rate values
+  // by forward-filling raw GPS HS values across the full-rate rows between GPS ticks
   let gi=0;
   for(let ri=0;ri<chanData.length;ri++){
     const t=chanRows[ri].t;
+    // Advance GPS pointer to the last GPS row at or before this time
     while(gi<gpsRows.length-1&&gpsRows[gi+1].t<=t) gi++;
     chanData[ri][20]=gpsRows[gi].hsl;
     chanData[ri][21]=gpsRows[gi].hsr;
   }
 
-  return{lat,lon,elapsed:chanElapsed,chanData,gpsElapsed,gpsChanData,fileName:name};
+  return{
+    lat,lon,
+    elapsed:chanElapsed,
+    chanData,
+    gpsElapsed,
+    gpsChanData,
+    fileName:name
+  };
 }
 
 function removeSession(idx){
@@ -613,7 +606,7 @@ function removeSession(idx){
 }
 
 // ════════════════════════════════════════════════════
-// LAP DETECTION
+// LAP DETECTION (Full Session Fallback Only)
 // ════════════════════════════════════════════════════
 function detectLaps(){
   allLaps=[];
@@ -705,9 +698,11 @@ new ResizeObserver(resizeMap).observe($('mapWrap'));resizeMap();
 let bgLats=[],bgLons=[];
 function drawBackground(){bgLats=[];bgLons=[];for(const s of sessions){bgLats.push(...s.lat);bgLons.push(...s.lon);}}
 
+// OPTIMIZED: Pre-calculate the projection math once per render
 function getProjector(allLa, allLo, W, H, pad=28) {
   if(!allLa.length) return (la,lo)=>[0,0];
   let minLa=allLa[0], maxLa=allLa[0], minLo=allLo[0], maxLo=allLo[0];
+  // Calculate bounds using a single loop, avoiding array spread memory overflows
   for(let i=1;i<allLa.length;i++){
     if(allLa[i]<minLa) minLa=allLa[i];
     if(allLa[i]>maxLa) maxLa=allLa[i];
@@ -741,6 +736,7 @@ function drawColorBar(name,cmin,cmax){
   $('cbMax').textContent=cmax.toFixed(1);$('cbMid').textContent=((cmin+cmax)/2).toFixed(1);$('cbMin').textContent=cmin.toFixed(1);
 }
 
+// Store last map state for crosshair re-draw
 let lastMapState=null;
 
 function paintMap(lapLa,lapLo,lapVals,cmin,cmax,cmapName,hsVals=null,hsLabel=null){
@@ -752,8 +748,10 @@ function paintMap(lapLa,lapLo,lapVals,cmin,cmax,cmapName,hsVals=null,hsLabel=nul
   const allLa=[...bgLats,...lapLa],allLo=[...bgLons,...lapLo];
   const proj = getProjector(allLa, allLo, W, H);
 
+  // Store projector + data for crosshair dot redraws
   lastMapState={lapLa,lapLo,proj,lapVals,cmin,cmax,cmapName,hsVals,hsLabel,light};
 
+  // Draw all session ghost tracks
   for(let si=0;si<sessions.length;si++){
     const s=sessions[si];if(s.lat.length<2)continue;
     mapCtx.beginPath();
@@ -763,6 +761,7 @@ function paintMap(lapLa,lapLo,lapVals,cmin,cmax,cmapName,hsVals=null,hsLabel=nul
     mapCtx.stroke();
   }
 
+  // Colored lap trace (primary channel)
   const cm=getCmap(cmapName);const rng=Math.max(cmax-cmin,1e-9);
   for(let i=0;i<lapLo.length-1;i++){
     const t=isNaN(lapVals[i])?0:(lapVals[i]-cmin)/rng;
@@ -772,6 +771,7 @@ function paintMap(lapLa,lapLo,lapVals,cmin,cmax,cmapName,hsVals=null,hsLabel=nul
     mapCtx.moveTo(x1,y1);mapCtx.lineTo(x2,y2);mapCtx.stroke();
   }
 
+  // HalfShaft overlay (drawn on top as thin colored line)
   if(hsVals&&hsVals.length===lapLa.length){
     const hsValid=hsVals.filter(v=>!isNaN(v));
     const hsMin=hsValid.length?Math.min(...hsValid):0;
@@ -783,15 +783,18 @@ function paintMap(lapLa,lapLo,lapVals,cmin,cmax,cmapName,hsVals=null,hsLabel=nul
       const[x1,y1]=proj(lapLa[i],lapLo[i]);
       const[x2,y2]=proj(lapLa[i+1],lapLo[i+1]);
       mapCtx.beginPath();
+      // Offset slightly so it shows beside the main trace
       mapCtx.strokeStyle=crgb(hsCm,t);mapCtx.lineWidth=2.5;mapCtx.lineCap='round';
       mapCtx.moveTo(x1+2,y1+2);mapCtx.lineTo(x2+2,y2+2);mapCtx.stroke();
     }
+    // Label
     mapCtx.fillStyle=light?'rgba(50,50,50,0.8)':'rgba(255,255,255,0.5)';
     mapCtx.font='bold 9px sans-serif';
     mapCtx.textAlign='left';mapCtx.textBaseline='top';
     mapCtx.fillText(`⬛ ${hsLabel||'HalfShaft'}`,6,H-18);
   }
 
+  // Lap start dot
   if(lapLa.length>0){
     const[x,y]=proj(lapLa[0],lapLo[0]);
     mapCtx.beginPath();mapCtx.arc(x,y,6,0,Math.PI*2);
@@ -799,11 +802,13 @@ function paintMap(lapLa,lapLo,lapVals,cmin,cmax,cmapName,hsVals=null,hsLabel=nul
   }
 }
 
+// Draw just the crosshair dot on the map (without redrawing entire map)
 function drawMapCrosshairDot(idx){
   if(!lastMapState)return;
   const{lapLa,lapLo,proj,light}=lastMapState;
   if(idx<0||idx>=lapLa.length)return;
   const[x,y]=proj(lapLa[idx],lapLo[idx]);
+  // We need to repaint the map then draw the dot on top
   paintMapFromState();
   mapCtx.beginPath();mapCtx.arc(x,y,7,0,Math.PI*2);
   mapCtx.fillStyle=light?'rgba(20,20,20,0.85)':'rgba(255,255,255,0.9)';
@@ -832,16 +837,10 @@ function setGpsLog(idx){
 function getThemeColors(){
   const light=document.body.classList.contains('light');
   return{
-    grid: light ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.35)',
-    tick: light ? '#888' : '#ffffff',
-    title: light ? '#666' : '#ffffff',
+    grid:light?'rgba(0,0,0,0.07)':'rgba(255,255,255,0.18)',
+    tick:light?'#888':'#aaa',
+    title:light?'#666':'#999',
   };
-}
-
-function xAxisLabel(){
-  if(xAxisMode==='time') return 'Time (s)';
-  if(xAxisMode==='rpm')  return 'RPM';
-  return 'Distance (m)';
 }
 
 function opts(){
@@ -857,25 +856,12 @@ function mkOrUp(id,data,o){
   charts[id]=new Chart($(id),{type:'line',data,options:o});return charts[id];
 }
 
-// ── mkDS: switches to scatter-dot mode when x-axis = RPM ──
 function mkDS(xVec,yVec,color,dashed=false,fill=false,yID='y'){
-  const isScatter=xAxisMode==='rpm';
-  return{
-    data:xVec.map((x,i)=>({x,y:isNaN(yVec[i])?null:yVec[i]})),
-    borderColor:color,
-    backgroundColor:isScatter?color:(fill?hexA(color,.18):'transparent'),
-    borderWidth:isScatter?0:(dashed?1.5:2),
-    pointRadius:isScatter?3:0,
-    pointHoverRadius:isScatter?5:0,
-    showLine:!isScatter,
-    fill:(!isScatter&&fill)?'origin':false,
-    tension:0,
-    spanGaps:!isScatter,
-    borderDash:(!isScatter&&dashed)?[5,3]:[],
-    yAxisID:yID
-  };
+  return{data:xVec.map((x,i)=>({x,y:isNaN(yVec[i])?null:yVec[i]})),
+    borderColor:color,backgroundColor:fill?hexA(color,.18):'transparent',
+    borderWidth:dashed?1.5:2,pointRadius:0,fill:fill?'origin':false,tension:0,spanGaps:true,
+    borderDash:dashed?[5,3]:[],yAxisID:yID};
 }
-
 function hexA(hex,a){
   const c=document.createElement('canvas').getContext('2d');
   c.fillStyle=hex;const col=c.fillStyle;
@@ -920,6 +906,7 @@ function lapVec(lapIdx){
   const sess=sessions[sessIdx];
   if(!sess||r1<=r0+1)return null;
 
+  // GPS-rate data for map
   const lat=sess.lat.slice(r0,r1+1);
   const lon=sess.lon.slice(r0,r1+1);
   const gpsT0=sess.gpsElapsed[r0];
@@ -927,6 +914,7 @@ function lapVec(lapIdx){
   const gpsCd=sess.gpsChanData.slice(r0,r1+1);
   const dist=cumDist(lat,lon);
 
+  // Full-rate data for charts
   const tMin=sess.gpsElapsed[r0],tMax=sess.gpsElapsed[r1];
   let ci0=0,ci1=sess.elapsed.length-1;
   while(ci0<sess.elapsed.length-1&&sess.elapsed[ci0]<tMin)ci0++;
@@ -935,6 +923,7 @@ function lapVec(lapIdx){
   const t=sess.elapsed.slice(ci0,ci1+1).map(v=>(v-chanT0)*60);
   const cd=sess.chanData.slice(ci0,ci1+1);
 
+  // Resample distance to full-rate time axis
   const gpsTabs=sess.gpsElapsed.slice(r0,r1+1);
   const tTabs=sess.elapsed.slice(ci0,ci1+1);
   function interpDist(tAbs){
@@ -945,9 +934,8 @@ function lapVec(lapIdx){
     return dist[lo]+f*(dist[lo+1]-dist[lo]);
   }
   const fullDist=tTabs.map(interpDist);
-  const rpm=cd.map(r=>r[I.RPM]);
 
-  return{lat,lon,t,dist:fullDist,rpm,cd,gpsT,gpsCd,si:sessIdx};
+  return{lat,lon,t,dist:fullDist,cd,gpsT,gpsCd,si:sessIdx};
 }
 function wSpd(cd){return cd.map(r=>{const a=r[I.WSRR],b=r[I.WSRL];return(isNaN(a)&&isNaN(b))?NaN:isNaN(a)?b:isNaN(b)?a:(a+b)/2;});}
 
@@ -960,52 +948,48 @@ function doUpdate(){
 
   const chanSel=parseInt($('chanSel').value)||0;
   const cmapStr=$('cmapSel').value;
-  const xLbl=xAxisLabel();
+  const useTime=$('xaxSel').value==='time';
+  const xLbl=useTime?'Time (s)':'Distance (m)';
 
   const pv=lapVec(selPri); if(!pv)return;
   const cv=selCmp>=0?lapVec(selCmp):null;
 
-  function getX(vec){
-    if(xAxisMode==='time')  return vec.t;
-    if(xAxisMode==='rpm')   return vec.rpm;
-    return vec.dist;
-  }
-  const pX=getX(pv);
-  const cX=cv?getX(cv):null;
+  const pX=useTime?pv.t:pv.dist;
+  const cX=cv?(useTime?cv.t:cv.dist):null;
 
   const ch=(cd,idx)=>cd.map(r=>r[idx]);
   const pTPS=ch(pv.cd,I.TPS),pFB=ch(pv.cd,I.FB),pRB=ch(pv.cd,I.RB),pRPM=ch(pv.cd,I.RPM),pGear=ch(pv.cd,I.GEAR),pChan=ch(pv.cd,chanSel),pWS=wSpd(pv.cd);
   const cTPS=cv?ch(cv.cd,I.TPS):null,cFB=cv?ch(cv.cd,I.FB):null,cRB=cv?ch(cv.cd,I.RB):null,cRPM=cv?ch(cv.cd,I.RPM):null,cGear=cv?ch(cv.cd,I.GEAR):null,cChan=cv?ch(cv.cd,chanSel):null,cWS=cv?wSpd(cv.cd):null;
 
   if(!slicePreviewActive){
-    const gpsLapIdx=(()=>{
-      if(sessions.length<2)return selPri;
-      const want=mapGpsLog;
-      if(allLaps[selPri].sessIdx===want)return selPri;
-      if(cv&&allLaps[selCmp].sessIdx===want)return selCmp;
-      return selPri;
-    })();
-    const gv=lapVec(gpsLapIdx)||pv;
-    const mapChan=ch(gv.gpsCd,chanSel);
-    const validM=mapChan.filter(v=>!isNaN(v));
-    const cmin=validM.length?Math.min(...validM):0;
-    const cmax=validM.length?Math.max(...validM):1;
-    const hsSel=$('halfshaftSel').value;
-    let hsVals=null,hsLabel=null;
-    if(hsSel==='hsl'){hsVals=ch(gv.gpsCd,I.HSL);hsLabel='HalfShaft L';}
-    else if(hsSel==='hsr'){hsVals=ch(gv.gpsCd,I.HSR);hsLabel='HalfShaft R';}
-    paintMap(gv.lat,gv.lon,mapChan,cmin,cmax===cmin?cmin+1:cmax,cmapStr,hsVals,hsLabel);
-    drawColorBar(cmapStr,cmin,cmax===cmin?cmin+1:cmax);
-    $('mapTitle').textContent=CHAN_NAMES[chanSel];
-    $('mapSub').textContent=allLaps[gpsLapIdx].label;
-    $('mapOverlay').style.display='block';
+  const gpsLapIdx=(()=>{
+    if(sessions.length<2)return selPri;
+    const want=mapGpsLog;
+    if(allLaps[selPri].sessIdx===want)return selPri;
+    if(cv&&allLaps[selCmp].sessIdx===want)return selCmp;
+    return selPri;
+  })();
+  const gv=lapVec(gpsLapIdx)||pv;
+  // Map uses GPS-rate interpolated channel data (gpsCd), not the full-rate cd
+  const mapChan=ch(gv.gpsCd,chanSel);
+  const validM=mapChan.filter(v=>!isNaN(v));
+  const cmin=validM.length?Math.min(...validM):0;
+  const cmax=validM.length?Math.max(...validM):1;
+  // Halfshaft overlay — also GPS-rate
+  const hsSel=$('halfshaftSel').value;
+  let hsVals=null,hsLabel=null;
+  if(hsSel==='hsl'){hsVals=ch(gv.gpsCd,I.HSL);hsLabel='HalfShaft L';}
+  else if(hsSel==='hsr'){hsVals=ch(gv.gpsCd,I.HSR);hsLabel='HalfShaft R';}
+  paintMap(gv.lat,gv.lon,mapChan,cmin,cmax===cmin?cmin+1:cmax,cmapStr,hsVals,hsLabel);
+  drawColorBar(cmapStr,cmin,cmax===cmin?cmin+1:cmax);
+  $('mapTitle').textContent=CHAN_NAMES[chanSel];
+  $('mapSub').textContent=allLaps[gpsLapIdx].label;
+  $('mapOverlay').style.display='block';
   }
 
   const priLabel=allLaps[selPri].label;
   const cmpLabel=cv?allLaps[selCmp].label:null;
   const tc=getThemeColors();
-
-  const isRpmX=xAxisMode==='rpm';
 
   {
     const o=opts();o.scales.x.title={display:true,text:xLbl,color:tc.title,font:{size:9}};
@@ -1053,42 +1037,21 @@ function doUpdate(){
   }
 
   {
-    const gearScales={
+    const o={...opts(),scales:{
       x:{type:'linear',grid:{color:tc.grid},ticks:{color:tc.tick,font:{size:9},maxTicksLimit:8},title:{display:true,text:xLbl,color:tc.title,font:{size:9}}},
       y:{grid:{color:tc.grid},ticks:{color:tc.tick,font:{size:9},maxTicksLimit:6},position:'left',title:{display:true,text:'Gear',color:tc.title,font:{size:9}}},
-    };
-    if(!isRpmX){
-      gearScales.y2={position:'right',grid:{drawOnChartArea:false},ticks:{color:C.rpm.pri,font:{size:9},maxTicksLimit:6},title:{display:true,text:'RPM/1000',color:tc.title,font:{size:9}}};
-    } else {
-      gearScales.y2={position:'right',grid:{drawOnChartArea:false},ticks:{color:C.spd.pri,font:{size:9},maxTicksLimit:6},title:{display:true,text:'Speed (mph)',color:tc.title,font:{size:9}}};
+      y2:{position:'right',grid:{drawOnChartArea:false},ticks:{color:C.rpm.pri,font:{size:9},maxTicksLimit:6},title:{display:true,text:'RPM/1000',color:tc.title,font:{size:9}}}
+    }};
+    const ds=[
+      mkDS(pX,pGear,C.gear.pri,false,false,'y'),
+      mkDS(pX,pRPM.map(v=>isNaN(v)?NaN:v/1000),C.rpm.pri,false,false,'y2'),
+    ];
+    const leg=[{label:'Gear',color:C.gear.pri,dashed:false},{label:'RPM',color:C.rpm.pri,dashed:false}];
+    if(cv){
+      ds.push(mkDS(cX,cGear,C.gear.cmp,true,false,'y'));
+      ds.push(mkDS(cX,cRPM.map(v=>isNaN(v)?NaN:v/1000),C.rpm.cmp,true,false,'y2'));
+      leg.push({label:'Gear cmp',color:C.gear.cmp,dashed:true},{label:'RPM cmp',color:C.rpm.cmp,dashed:true});
     }
-    const o={...opts(),scales:gearScales};
-
-    let ds,leg;
-    if(!isRpmX){
-      ds=[
-        mkDS(pX,pGear,C.gear.pri,false,false,'y'),
-        mkDS(pX,pRPM.map(v=>isNaN(v)?NaN:v/1000),C.rpm.pri,false,false,'y2'),
-      ];
-      leg=[{label:'Gear',color:C.gear.pri,dashed:false},{label:'RPM',color:C.rpm.pri,dashed:false}];
-      if(cv){
-        ds.push(mkDS(cX,cGear,C.gear.cmp,true,false,'y'));
-        ds.push(mkDS(cX,cRPM.map(v=>isNaN(v)?NaN:v/1000),C.rpm.cmp,true,false,'y2'));
-        leg.push({label:'Gear cmp',color:C.gear.cmp,dashed:true},{label:'RPM cmp',color:C.rpm.cmp,dashed:true});
-      }
-    } else {
-      ds=[
-        mkDS(pX,pGear,C.gear.pri,false,false,'y'),
-        mkDS(pX,pWS,C.spd.pri,false,false,'y2'),
-      ];
-      leg=[{label:'Gear',color:C.gear.pri,dashed:false},{label:'Speed',color:C.spd.pri,dashed:false}];
-      if(cv){
-        ds.push(mkDS(cX,cGear,C.gear.cmp,true,false,'y'));
-        ds.push(mkDS(cX,cWS,C.spd.cmp,true,false,'y2'));
-        leg.push({label:'Gear cmp',color:C.gear.cmp,dashed:true},{label:'Speed cmp',color:C.spd.cmp,dashed:true});
-      }
-    }
-
     if(!charts['gearChart']){charts['gearChart']=new Chart($('gearChart'),{type:'line',data:{datasets:ds},options:o});}
     else{charts['gearChart'].data={datasets:ds};charts['gearChart'].options=o;charts['gearChart'].update('none');}
     makeLegend('leg-gear',leg);
@@ -1181,9 +1144,11 @@ function doUpdate(){
     ${cmpHtml}
   `;
 
+  // Store data for crosshair system
   storeCrosshairData({pX,pv,cv,cX,pTPS,pWS,pFB,pRB,pRPM,pGear,pChan,
-    cTPS,cWS,cFB,cRB,cRPM,cGear,cChan,chanSel,useTime:xAxisMode==='time',
+    cTPS,cWS,cFB,cRB,cRPM,cGear,cChan,chanSel,useTime,
     pGpsT:pv.gpsT});
+  // Attach listeners (idempotent)
   attachCrosshairListeners();
 }
 
@@ -1218,7 +1183,10 @@ function updateSlicerUI(){
   const s0=$('sliceStart'), s1=$('sliceEnd');
   const prevMax=parseInt(s0.max)||1000;
   s0.max=n; s1.max=n;
-  if(prevMax!==n){s0.value=0;s1.value=n;}
+  if(prevMax!==n){
+    s0.value=0;
+    s1.value=n;
+  }
   sliceR0=parseInt(s0.value);
   sliceR1=parseInt(s1.value);
   updateSliceLabels();
@@ -1254,6 +1222,7 @@ function drawSlicePreview(){
 
   const allLa=[...bgLats], allLo=[...bgLons];
   if(!allLa.length)return;
+
   const proj = getProjector(allLa, allLo, W, H);
 
   for(let si=0;si<sessions.length;si++){
@@ -1290,13 +1259,15 @@ function drawSlicePreview(){
       const r=Math.round(60+t*168), g=Math.round(175-t*43), b=Math.round(60-t*20);
       mapCtx.beginPath();
       mapCtx.strokeStyle=`rgb(${r},${g},${b})`;
-      mapCtx.lineWidth=3.5;mapCtx.lineCap='round';
+      mapCtx.lineWidth=3.5;
+      mapCtx.lineCap='round';
       const[x1,y1]=proj(slat[i],slon[i]);
       const[x2,y2]=proj(slat[i+1],slon[i+1]);
       mapCtx.moveTo(x1,y1);mapCtx.lineTo(x2,y2);
       mapCtx.stroke();
     }
   }
+
   if(slat.length>0){
     const[x,y]=proj(slat[0],slon[0]);
     mapCtx.beginPath();mapCtx.arc(x,y,6,0,Math.PI*2);
@@ -1307,7 +1278,7 @@ function drawSlicePreview(){
     mapCtx.fillText('S',x,y);
   }
   if(slat.length>1){
-    const[x,y]=proj(slat[slat.length-1],slon[slat.length-1]);
+    const[x,y]=proj(slat[slat.length-1],slon[slon.length-1]);
     mapCtx.beginPath();mapCtx.arc(x,y,6,0,Math.PI*2);
     mapCtx.fillStyle='#e8943a';mapCtx.fill();
     mapCtx.strokeStyle='#fff';mapCtx.lineWidth=1.5;mapCtx.stroke();
@@ -1315,6 +1286,7 @@ function drawSlicePreview(){
     mapCtx.textAlign='center';mapCtx.textBaseline='middle';
     mapCtx.fillText('E',x,y);
   }
+
   if(segN>20){
     for(let p=1;p<=9;p++){
       const i=Math.round(p*segN/10);
@@ -1336,6 +1308,7 @@ function drawSlicePreviewWithGhost(origR0, origR1){
 
   const allLa=[...bgLats], allLo=[...bgLons];
   if(!allLa.length)return;
+
   const proj = getProjector(allLa, allLo, W, H);
 
   for(let si=0;si<sessions.length;si++){
@@ -1352,6 +1325,7 @@ function drawSlicePreviewWithGhost(origR0, origR1){
   }
 
   const sess=sessions[Math.min(sliceSess,sessions.length-1)];
+
   if(origR0!==undefined&&origR1!==undefined){
     const glat=sess.lat.slice(origR0,origR1+1);
     const glon=sess.lon.slice(origR0,origR1+1);
@@ -1382,13 +1356,15 @@ function drawSlicePreviewWithGhost(origR0, origR1){
       const r=Math.round(60+t*168), g=Math.round(175-t*43), b=Math.round(60-t*20);
       mapCtx.beginPath();
       mapCtx.strokeStyle=`rgb(${r},${g},${b})`;
-      mapCtx.lineWidth=3.5;mapCtx.lineCap='round';
+      mapCtx.lineWidth=3.5;
+      mapCtx.lineCap='round';
       const[x1,y1]=proj(slat[i],slon[i]);
       const[x2,y2]=proj(slat[i+1],slon[i+1]);
       mapCtx.moveTo(x1,y1);mapCtx.lineTo(x2,y2);
       mapCtx.stroke();
     }
   }
+
   if(slat.length>0){
     const[x,y]=proj(slat[0],slon[0]);
     mapCtx.beginPath();mapCtx.arc(x,y,6,0,Math.PI*2);
@@ -1399,7 +1375,7 @@ function drawSlicePreviewWithGhost(origR0, origR1){
     mapCtx.fillText('S',x,y);
   }
   if(slat.length>1){
-    const[x,y]=proj(slat[slat.length-1],slon[slat.length-1]);
+    const[x,y]=proj(slat[slat.length-1],slon[slon.length-1]);
     mapCtx.beginPath();mapCtx.arc(x,y,6,0,Math.PI*2);
     mapCtx.fillStyle='#e8943a';mapCtx.fill();
     mapCtx.strokeStyle='#fff';mapCtx.lineWidth=1.5;mapCtx.stroke();
@@ -1407,6 +1383,7 @@ function drawSlicePreviewWithGhost(origR0, origR1){
     mapCtx.textAlign='center';mapCtx.textBaseline='middle';
     mapCtx.fillText('E',x,y);
   }
+
   if(segN>20){
     for(let p=1;p<=9;p++){
       const i=Math.round(p*segN/10);
@@ -1421,6 +1398,7 @@ function drawSlicePreviewWithGhost(origR0, origR1){
 // CROSSHAIR SYSTEM
 // ════════════════════════════════════════════════════
 let crosshairData=null;
+
 function storeCrosshairData(d){crosshairData=d;}
 
 function nearestIdx(xVec,x){
@@ -1461,7 +1439,7 @@ function showCrosshairTooltip(e,xVal,idx){
   const d=crosshairData;
   const fmt1=v=>isNaN(v)?'—':v.toFixed(1);
   const fmt0=v=>isNaN(v)?'—':v.toFixed(0);
-  const xLabel=d.useTime?`${xVal.toFixed(2)}s`:xAxisMode==='rpm'?`${xVal.toFixed(0)} rpm`:`${xVal.toFixed(1)}m`;
+  const xLabel=d.useTime?`${xVal.toFixed(2)}s`:`${xVal.toFixed(1)}m`;
   const tps=d.pTPS[idx];
   const spd=d.pWS[idx];
   const fb=d.pFB[idx];
@@ -1470,13 +1448,13 @@ function showCrosshairTooltip(e,xVal,idx){
   const rpm=d.pRPM[idx];
   const chan=d.pChan[idx];
 
-  let rows=`<div class="ct-head">${xAxisMode==='time'?'Time':xAxisMode==='rpm'?'RPM':'Dist'}: ${xLabel}</div>`;
+  let rows=`<div class="ct-head">${d.useTime?'Time':'Dist'}: ${xLabel}</div>`;
   rows+=`<div class="ct-row"><span class="ct-key">TPS</span><span class="ct-val">${fmt1(tps)}%</span></div>`;
   rows+=`<div class="ct-row"><span class="ct-key">Speed</span><span class="ct-val">${fmt1(spd)} mph</span></div>`;
   if(!isNaN(fb)) rows+=`<div class="ct-row"><span class="ct-key">Brk F</span><span class="ct-val">${fmt0(fb)} psi</span></div>`;
   if(!isNaN(rb)) rows+=`<div class="ct-row"><span class="ct-key">Brk R</span><span class="ct-val">${fmt0(rb)} psi</span></div>`;
   rows+=`<div class="ct-row"><span class="ct-key">Gear</span><span class="ct-val">${isNaN(gear)?'—':gear.toFixed(0)}</span></div>`;
-  if(xAxisMode!=='rpm') rows+=`<div class="ct-row"><span class="ct-key">RPM</span><span class="ct-val">${fmt0(rpm)}</span></div>`;
+  rows+=`<div class="ct-row"><span class="ct-key">RPM</span><span class="ct-val">${fmt0(rpm)}</span></div>`;
   if(d.chanSel!==0&&d.chanSel!==8&&d.chanSel!==9)
     rows+=`<div class="ct-row"><span class="ct-key">${CHAN_NAMES[d.chanSel]}</span><span class="ct-val">${fmt1(chan)} ${CHAN_UNITS[d.chanSel]}</span></div>`;
 
@@ -1490,7 +1468,9 @@ function showCrosshairTooltip(e,xVal,idx){
   tt.style.left=lx+'px';tt.style.top=ly+'px';
 }
 
-function hideCrosshairTooltip(){$('crosshairTooltip').style.display='none';}
+function hideCrosshairTooltip(){
+  $('crosshairTooltip').style.display='none';
+}
 
 function attachCrosshairListeners(){
   const chartIds=['spdChart','tpsChart','brkChart','traceChart','gearChart'];
@@ -1498,6 +1478,7 @@ function attachCrosshairListeners(){
     const canvas=$(id);
     if(!canvas||canvas._crosshairAttached)return;
     canvas._crosshairAttached=true;
+
     canvas.addEventListener('mousemove',e=>{
       const ch=charts[id];if(!ch||!crosshairData)return;
       const rect=canvas.getBoundingClientRect();
@@ -1508,12 +1489,13 @@ function attachCrosshairListeners(){
       if(mx<area.left||mx>area.right){hideCrosshairTooltip();clearCrosshairLines();paintMapFromState();return;}
       const idx=nearestIdx(crosshairData.pX,xVal);
       const gpsT=crosshairData.pGpsT;
-      const gpsIdx=gpsT?nearestIdx(gpsT,xAxisMode==='time'?crosshairData.pv.gpsT:crosshairData.pGpsT,xAxisMode==='time'?xVal:crosshairData.pX[idx]):idx;
+      const gpsIdx=gpsT?nearestIdx(gpsT,xVal):idx;
       clearCrosshairLines();
       drawCrosshairLines(xVal);
-      drawMapCrosshairDot(Math.min(gpsIdx,crosshairData.pv.lat.length-1));
+      drawMapCrosshairDot(gpsIdx);
       showCrosshairTooltip(e,xVal,idx);
     });
+
     canvas.addEventListener('mouseleave',()=>{
       hideCrosshairTooltip();
       clearCrosshairLines();
@@ -1535,6 +1517,7 @@ function toggleLightMode(){
 // ════════════════════════════════════════════════════
 // BUTTON HANDLERS
 // ════════════════════════════════════════════════════
+
 let pendingNameLapIdx=-1;
 function showLapNameEditor(lapIdx){
   pendingNameLapIdx=lapIdx;
@@ -1562,7 +1545,9 @@ function updateEditLapPanel(){
   $('editLapRow').style.display=isManual?'block':'none';
   $('editLapApply').style.display='none';
   $('editLapDelete').style.display='none';
-  if(isManual){$('editLapDelete').style.display='block';}
+  if(isManual){
+    $('editLapDelete').style.display='block';
+  }
   if(!isManual) editingLapIdx=-1;
 }
 
@@ -1624,6 +1609,7 @@ document.addEventListener('drop',e=>{
 
 $('chanSel').addEventListener('change',doUpdate);
 $('cmapSel').addEventListener('change',doUpdate);
+$('xaxSel').addEventListener('change',doUpdate);
 $('halfshaftSel').addEventListener('change',doUpdate);
 
 function getEditGhost(){
